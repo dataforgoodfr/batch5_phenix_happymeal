@@ -2,6 +2,7 @@
 
 The main goal of this repository is to create balanced meals from a list of products
 
+
 ## Requirements
 The numpy and [openfoodfacts](https://github.com/openfoodfacts/openfoodfacts-python) packages are required to properly use the repo.
 Tested on the following version:
@@ -52,7 +53,6 @@ To check the full list of arguments and their meaning, use the help of the parse
 ```bash
 python tetris_demo.py -h
 ```
-
 
 ## TODO
 - [x] Implement an EAN - product information function
