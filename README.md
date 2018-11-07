@@ -54,6 +54,12 @@ To check the full list of arguments and their meaning, use the help of the parse
 python tetris_demo.py -h
 ```
 
+## Useful links
+[Git Cheat Sheet](https://data-for-good.slack.com/files/U284ZS6JW/FDSA71Q0H/git-cheatsheet.pdf)
+[Phenix Trello](https://trello.com/b/X9SX81OU/algo-matching-db-open-food-fact)
+[Data4Good Github](https://github.com/dataforgoodfr/)
+
+
 ## TODO
 - [x] Implement an EAN - product information function
 - [x] Implement a naive meal balancing algorithm
