@@ -57,7 +57,7 @@ python tetris_demo.py -h
 ## Useful links
 [Git Cheat Sheet](https://data-for-good.slack.com/files/U284ZS6JW/FDSA71Q0H/git-cheatsheet.pdf) <br>
 [Phenix Trello](https://trello.com/b/X9SX81OU/algo-matching-db-open-food-fact) <br>
-[Data4Good Github](https://github.com/dataforgoodfr/) <br>
+[Data for Good France Github](https://github.com/dataforgoodfr/) <br>
 
 
 ## TODO
