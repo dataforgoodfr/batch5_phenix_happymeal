@@ -11,7 +11,7 @@ __version__ = '0.1'
 __maintainer__ = 'François-Guillaume Fernandez'
 __status__ = 'Development'
 
-#import openfoodfacts
+import openfoodfacts
 import math
 import re
 import pandas as pd
@@ -162,7 +162,7 @@ def convert_qty2gram(qty = {'val': '', 'unit': ''}):
         dict with value converted to grams (if possible) and
         two new keys:
            std: True if value could be converted using a standard 
-                conversion faction
+                conversion factor
            approx: True if the original units were not in 'g', 'kg', 'mg'
     """
     init_val = qty['val']
