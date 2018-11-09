@@ -56,18 +56,21 @@ def convert_quantity(str_qty):
     value = None
     unit = None
     dict_qty = {'val': value, 'unit': unit}
+    
     try:
         lst_qty = str_qty.split(',')
-        lst_dict = []
-        for s in lst_qty:
-            string = s.strip()
-            value = re.search('\\d+[,.]?\\d*',string).group(0) if re.search('\\d+[,.]?\\d*',string)!=None else ''
-            unit = re.search('([a-zA-Z]+)',string).group(0) if re.search('([a-zA-Z]+)',string)!=None else ''
-            unit = clean_qty2stdunit(unit)
-            dict_qty = rename_qty2stdunit({'val': value, 'unit': unit})
-            return dict_qty
     except:
+        lst_qty = ['','']
+        
+    lst_dict = []
+    for s in lst_qty:
+        string = s.strip()
+        value = float(re.search('\d+[,.]?\d*',string).group(0)) if re.search('\d+[,.]?\d*',string)!=None else ''
+        unit = re.search('([a-zA-Z]+)',string, re.UNICODE).group(0) if re.search('([a-zA-Z]+)',string, re.UNICODE)!=None else ''
+        unit = rename_qty2stdunit(unit)
+        dict_qty = convert_qty2gram({'val': value, 'unit': unit})
         return dict_qty
+    
     return dict_qty
 
 def rename_qty2stdunit(unit):
@@ -89,7 +92,7 @@ def rename_qty2stdunit(unit):
                     'gal':['gal','gallon','GAL','Gal','GALLON','Gallon'],
                     'egg':['egg','eggs','Eggs','huevos','oeufs','Oeufs','ufs'],
                     'portion':['portion','servings','Servings','Serving',
-                         'triangles','beignets','galettes','baguettines',
+                         'Unidad', 'triangles','beignets','galettes','baguettines',
                          'oranges','magret','baguette','Galettes','courge',
                          'galetttes','meringues','galetted','baguettes',
                          'Burger','gaufrettes','mangue','yogourts','gaufres',
@@ -104,10 +107,10 @@ def rename_qty2stdunit(unit):
                     'oz':['oz','OZ','Oz','oZ'],
                     'lb':['lb','LB','Lb','lB','lbs']}
     std_unit = [key  for (key, value) in clean_matrix.items() if (unit in value)]
-    std_unit = [None] if not std_unit else std_unit
+    std_unit = [unit] if not std_unit else std_unit
     return std_unit[0]
 
-def convert_qty2gram(qty = {'val': None, 'unit': None}):
+def convert_qty2gram(qty = {'val': '', 'unit': ''}):
     """
     Convert OFF quantity to a standard quantity (in grams)
     Args:
@@ -130,11 +133,11 @@ def convert_qty2gram(qty = {'val': None, 'unit': None}):
                       'dl':100.0,
                       'oz':28.3495,
                       'lb':453.592}
-    try:
+    if (init_val!='') & (init_unit in convert_matrix.keys()):
         conv_val = convert_matrix[init_unit]*init_val
         conv_unit = 'g'
         conv_std = True
-    except:
+    else:
         conv_val = init_val
         conv_unit = init_unit
         conv_std = False
