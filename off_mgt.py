@@ -11,7 +11,10 @@ __version__ = '0.1'
 __maintainer__ = 'François-Guillaume Fernandez'
 __status__ = 'Development'
 
-import openfoodfacts
+#import openfoodfacts
+import math
+import re
+import pandas as pd
 
 
 def get_product_information(barcode):
@@ -44,34 +47,74 @@ def get_product_information(barcode):
                                    nutri_score=p.get('nutrition_grade_fr'))
     return product_information
 
+
 def convert_quantity(str_qty):
     """
     Convert OFF quantity to [value, unit]
+
+    For strings that contain several quantities, 
+    returns the most precise quantity (g, kg, mg > everything else)
+    and then the highest quantity 
+    e.g. "130 g (4 tranches de 32,5 g)" => 130 g
+    "230 g, dont 30 g d'accompagnement, en 2 portions" => 230 g
+
     Args:
-        str_qty (str): OFF quantity extract (first number found)
+        str_qty (str): OFF quantity extract 
     Returns:
         dict_qty (dict): nested dictionary with product quantity
     """
-    import re
     value = None
     unit = None
     dict_qty = {'val': value, 'unit': unit}
-    
+
+    if type(str_qty) == float and math.isnan(str_qty):
+        return dict_qty
+
+    # remove all stray 'e' in OFF quantity strings
+    # regex matches whitespace followed by 'e' followed by any of whitespace, EOS, non-word character
+    # only remove the 'e' and keep all other characters
+    str_qty = re.sub('(\s+)(?:e)(\s|$|\W)', r'\1\2', str_qty)
+
+    # split string into individual pieces of information
+    # e.g. "400 g, 2 sachets" => ["400 g", "2 sachets"]
+    pattern = ',\s+|\s+,|\(|\)|soit'
     try:
-        lst_qty = str_qty.split(',')
+        lst_qty = re.split(pattern, str_qty)
     except:
-        lst_qty = ['','']
-        
+        lst_qty = ['']
+
     lst_dict = []
     for s in lst_qty:
+        if (s is None) or (s == ''):
+            continue
         string = s.strip()
-        value = float(re.search('\d+[,.]?\d*',string).group(0)) if re.search('\d+[,.]?\d*',string)!=None else ''
-        unit = re.search('([a-zA-Z]+)',string, re.UNICODE).group(0) if re.search('([a-zA-Z]+)',string, re.UNICODE)!=None else ''
+        # regex matches integer or decimal (value), and the following letters (unit)
+        # up until whitespace or non-word character
+        pattern = '(\d+[,.]?\d*)\s*([a-zA-Z]+)(?:\s|]|\W)*'
+        m = re.search(pattern, string, re.UNICODE)
+        if m is None:
+            print(s, 'not matched by regex')
+            continue
+        value = float(m.group(1).replace(',','.'))
+        unit = m.group(2)
         unit = rename_qty2stdunit(unit)
         dict_qty = convert_qty2gram({'val': value, 'unit': unit})
-        return dict_qty
-    
-    return dict_qty
+        lst_dict.append(dict_qty)
+
+    if len(lst_dict) == 1:
+        return lst_dict[0]
+
+    else:
+        df = pd.DataFrame(lst_dict) 
+        # Return the most precise quantity (g, kg, mg > everything else),
+        # then the heaviest quantity.
+        # Precision is more important than weight.
+        # Only return non-converted quantity if no converted quantity
+        # is available
+        df = df.sort_values(by=['std', 'approx', 'val'], ascending=[False, True, False])
+
+        return df.iloc[0].to_dict()
+
 
 def rename_qty2stdunit(unit):
     """
@@ -114,13 +157,17 @@ def convert_qty2gram(qty = {'val': '', 'unit': ''}):
     """
     Convert OFF quantity to a standard quantity (in grams)
     Args:
-        unit (dict): OFF quantity value
+        qty (dict): OFF quantity value and unit
     Returns:
-        std_unit (str): standard unit name
+        dict with value converted to grams (if possible) and
+        two new keys:
+           std: True if value could be converted using a standard 
+                conversion faction
+           approx: True if the original units were not in 'g', 'kg', 'mg'
     """
     init_val = qty['val']
     init_unit = qty['unit']
-    
+
     convert_matrix = {'g':1.0,
                       'kg':1000,
                       'mg':0.001,
@@ -141,7 +188,13 @@ def convert_qty2gram(qty = {'val': '', 'unit': ''}):
         conv_val = init_val
         conv_unit = init_unit
         conv_std = False
-    return {'val': conv_val, 'unit': conv_unit, 'std':conv_std}
+
+    # all conversions not from g, kg or mg are approximate conversions
+    approx = True
+    if init_unit in ['g', 'kg', 'mg']:
+        approx = False
+
+    return {'val': conv_val, 'unit': conv_unit, 'std': conv_std, 'approx': approx}
 
 def rename_group(str_group2=None):
     """
@@ -149,7 +202,7 @@ def rename_group(str_group2=None):
     Args:
         str_group2 (str): OFF food group name
     Returns:
-        conv_group (str): standard food group name 
+        conv_group (str): standard food group name
     """
     #convert_group1 = {'Beverage':['Beverages'],
     #                  'Cereals':['Cereals and potatoes'],
