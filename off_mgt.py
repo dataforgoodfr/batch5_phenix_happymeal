@@ -95,7 +95,7 @@ def convert_quantity(str_qty):
         # Regex matches integer followed by x or *, followed by integer
         # or decimal (value), and the following letters (unit)
         # up until whitespace or non-word character
-        pattern = '(\d+)\s*[\*x]\s*(\d+[,.]?\d*)\s*([a-zA-Z]+)(?:\s|]|\W)*'
+        pattern = '(\d+)\s*[\*xX]\s*(\d+[,.]?\d*)\s*([a-zA-Z]+)(?:\s|]|\W)*'
         m = re.search(pattern, string, re.UNICODE)
         if m is not None:
             multiplier = int(m.group(1))
@@ -109,22 +109,22 @@ def convert_quantity(str_qty):
         # Regex matches integer or decimal (value), and the following letters (unit)
         # up until whitespace or non-word character
         pattern = '(\d+[,.]?\d*)\s*([a-zA-Z]+)(?:\s|]|\W)*'
-        m = re.search(pattern, string, re.UNICODE)
-        if m is not None:
-            value = float(m.group(1).replace(',','.'))
-            unit = rename_qty2stdunit(m.group(2))
+        el = re.findall(pattern, string, re.UNICODE)
+        for m in el:
+            value = float(m[0].replace(',','.'))
+            unit = rename_qty2stdunit(m[1])
             dict_qty = convert_qty2gram({'val': value, 'unit': unit})
             lst_dict.append(dict_qty)
             continue
 
-        print(s, 'not matched by regex')
+        #print(s, 'not matched by regex')
 
     if len(lst_dict) == 0:
         return dict_qty
-
+      
     elif len(lst_dict) == 1:
         return lst_dict[0]
-
+      
     else:
         df = pd.DataFrame(lst_dict) 
         # Return the most precise quantity (g, kg, mg > everything else),
@@ -155,7 +155,7 @@ def rename_qty2stdunit(unit):
                     'mg':['mg','mcg','mG','Mg','MG'],
                     'gal':['gal','gallon','GAL','Gal','GALLON','Gallon'],
                     'egg':['egg','eggs','Eggs','huevos','oeufs','Oeufs','ufs'],
-                    'portion':['portion','servings','Servings','Serving',
+                    'portion':['portion','PART','PARTS','servings','Servings','Serving',
                          'Unidad', 'triangles','beignets','galettes','baguettines',
                          'oranges','magret','baguette','Galettes','courge',
                          'galetttes','meringues','galetted','baguettes',
