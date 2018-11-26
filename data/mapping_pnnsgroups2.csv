@@ -1,39 +1,39 @@
-﻿pnns_groups_2;code_cat
-Alcoholic beverages;0
-Appetizers;2
-Artificially sweetened beverages;0
-Biscuits and cakes;2
-Bread;5
-Breakfast cereals;5
-Cereals;5
-Cheese;4
-Chocolate products;2
-Dairy desserts;4
-Dressings and sauces;3
-Dried fruits;6
-Eggs;1
-Fats;3
-Fish and seafood;1
-Fruit juices;0
-Fruit nectars;0
-fruits;6
-Fruits;6
-Ice cream;2
-Legumes;6
-Meat;1
-Milk and yogurt;4
-Non-sugared beverages;0
-Nuts;2
-One-dish meals;0
-pastries;2
-Pizza pies and quiche;0
-Potatoes;5
-Processed meat;1
-Salty and fatty products;2
-Sandwich;0
-Soups;6
-Sweetened beverages;0
-Sweets;2
-Tripe dishes;1
-vegetables;6
-Vegetables;6
+pnns_groups_2;code_cat1;code_cat2
+Alcoholic beverages;0;0
+Appetizers;20;20
+Artificially sweetened beverages;20;20
+Biscuits and cakes;20;20
+Bread;50;51
+Breakfast cereals;50;52
+Cereals;50;51
+Cheese;40;42
+Chocolate products;20;20
+Dairy desserts;40;41
+Dressings and sauces;30;30
+Dried fruits;60;61
+Eggs;10;11
+Fats;30;30
+Fish and seafood;10;12
+Fruit juices;20;20
+Fruit nectars;20;20
+fruits;60;61
+Fruits;60;61
+Ice cream;20;20
+Legumes;60;62
+Meat;10;11
+Milk and yogurt;40;41
+Non-sugared beverages;0;0
+Nuts;20;20
+One-dish meals;70;70
+pastries;20;20
+Pizza pies and quiche;70;70
+Potatoes;50;52
+Processed meat;10;11
+Salty and fatty products;20;20
+Sandwich;70;70
+Soups;60;62
+Sweetened beverages;20;20
+Sweets;20;20
+Tripe dishes;20;20
+vegetables;60;62
+Vegetables;60;62
