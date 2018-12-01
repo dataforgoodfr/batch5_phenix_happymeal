@@ -2,8 +2,31 @@
 
 The main goal of this repository is to create balanced meals from a list of products
 
+## Understanding our algorithm
+### Overview of the balanced meal generation process
 
-## Requirements
+In the following workflow, EAN means European Article Number and OFF Open Food Facts.
+
+![Image](Input2BalancedMeals20181201-1537.jpg "icon")
+
+(Source code of this workflow can be found [here](Input2BalancedMeals20181201-1537.xml))
+
+### Matching
+We used the Naive Bayes method in order to automatically assign categories to articles according to their names.
+### Classifier
+We used the Random Forest method (40 trees) to automatically assign categories to articles according to their nutrients (6 features).
+### Defining weights in grams
+This algorithm works as follow: 
+
+- If the quantity is mentioned in OFF, then convert the quantity in grams
+    - if not, then compute the average of article's category quantity
+- If the article rice, semolina, pasta or instant mashed potatoes, then multiply by a specific coefficient
+### Optimizer
+Description can be found [here](https://github.com/dataforgoodfr/batch5_phenix_happymeal/tree/master/algos-optimisation).
+### Reallocating remaining articles
+_add a description here_
+
+## Requirements
 The numpy and [openfoodfacts](https://github.com/openfoodfacts/openfoodfacts-python) packages are required to properly use the repo.
 Tested on the following version:
 ```python
@@ -55,12 +78,15 @@ python tetris_demo.py -h
 ```
 
 ## Useful links
-[Git Cheat Sheet](https://data-for-good.slack.com/files/U284ZS6JW/FDSA71Q0H/git-cheatsheet.pdf) <br>
-[Phenix Trello](https://trello.com/b/X9SX81OU/algo-matching-db-open-food-fact) <br>
-[Data for Good France Github](https://github.com/dataforgoodfr/) <br>
+
+- Understanding Git
+    - [Git Data Transport commands](https://appendtonew.wpengine.com/wp-content/uploads/2015/06/Screen-Shot-2015-06-24-at-8.37.13-PM-1024x663.png)
+    - [Git Cheat Sheet](https://www.dropbox.com/s/jsivybz7qmj4od4/git-cheat-sheet-v2.pdf?dl=0)
+- [Project Slack](https://data-for-good.slack.com)
+- [Project Trello](https://trello.com/b/X9SX81OU/algo-matching-db-open-food-fact)
 
 
-## TODO
+## TODO
 - [x] Implement an EAN - product information function
 - [x] Implement a naive meal balancing algorithm
 - [ ] Explore brute force and smart optimisation techniques
