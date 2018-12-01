@@ -1,0 +1,354 @@
+---
+title: "To which food group does a product of OpenFoodFacts belong ?"
+author: "Mehdi Miah (mehdi.miah@gmail.com)"
+date: "`r format(Sys.time(), '%d-%m-%Y')`"
+output:
+  html_document:
+    toc: true
+    theme: united
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+_**Abstract** : Given a product of OpenFoodFacts's database, this notebook predicts in which food group it belongs to. The algorithm relies on a (un-optimized) decision tree and six features : the mass of sugar, carbohydrate (= glucide in French), salt, proteins, fat and saturated fat in 100g of food. Firstly, some statistics and data visualization are shown in order to prove that this methodology may work, then a decision tree is fitted with the data. Finally, this approch enables to predict for 3 out of 4 products the food group with an accuracy of 70%._
+  
+  
+# Setup
+
+```{r setup, message = FALSE, warning = FALSE}
+
+# Remove all variables
+rm(list = ls())
+
+# Libraries
+library(data.table) #to read (fread) databases
+library(knitr) #for notebook
+library(ggplot2) #for dataviz
+library(ggrepel) #for labeling points nicely
+library(rpart) #for decision tree
+library(rpart.plot) #to plot decision tree
+library(tidyr) #to handle dataframes
+library(dplyr) #to handle dataframes
+
+```
+
+# Opening the file
+
+```{r}
+# Opening the file
+na_strings = c(NA, "NA", "") #values considered as missing values
+openfoodfacts = fread("../data/openfoodfacts/intermediate/openfoodfacts.csv", sep = ";", stringsAsFactors = FALSE, data.table = FALSE, encoding = "UTF-8", na.strings = na_strings)
+
+# Structure of the file
+str(openfoodfacts)
+```
+
+# How to classify foods ?
+
+The goal of the project is to generate balanced meals. One definition of a balanced meal is proposed in the article "recommandations-pour-un-colis-d-aide-alimentaire-equilibre_doc" (cf Slack). The perfect meal is the one below : 
+
+<center>![](../doc/nutrition équilibrée/repartition des aliments d'une aide alimentaire équilibrée.png){ width=60% }</center>
+
+Is there any variable in the Open Food Facts's database which is close of the main groups ? Yes, there is hopefully one : "groupe_1"
+
+Let's see the values taken by this variable : 
+
+```{r}
+# Unique values taken by the variable groupe_1
+openfoodfacts$groupe_1 %>% unique() %>% sort()
+```
+
+If one only consideres the main food groups of the chart, one gets the following links with the Open Food Facts's database : 
+
+| Food group in the file          | Food group in OpenFoodFacts |
+|---------------------------------|-----------------------------|
+| Fruits et légumes               | Fruits and vegetables       |
+| Produits gras, sucrés, salés    | Sugary snacks + Salty snacks|
+| Viande, poisson, oeuf           | Fish, meat, eggs            |
+| Matières grasses ajoutées       | Fat and sauce               |
+| Lait et produits laitiers       | Milk and dairy products     |
+| Féculents                       | Cereals and potatoes        |
+| -                               | Composite foods + Beverages |
+
+Now, let's see if this variable is correctly provided in the database.
+
+<span style="color:grey">There are two remained tasks : how to deal with composite foods (salads, pizza, ...) and beverages (orange juice, coke, ...), and can we get a similar variable for the sub-category fruits, cheese, ... ? </span> 
+
+# Missing values
+
+```{r fig.width=7, fig.height=4}
+# Percentage of missing values per variable
+pct_NA_variable_OFF = (colSums(is.na(openfoodfacts)) / nrow(openfoodfacts) * 100) 
+
+# Get a nice dataframe
+pct_NA_variable_OFF = pct_NA_variable_OFF %>% as.data.frame()
+names(pct_NA_variable_OFF) = c("pct")
+pct_NA_variable_OFF$variable = rownames(pct_NA_variable_OFF)
+
+# Sort the variable 
+pct_NA_variable_OFF$variable = factor(pct_NA_variable_OFF$variable, 
+                                      levels = pct_NA_variable_OFF$variable[order(pct_NA_variable_OFF$pct)])
+  
+# Get a nice visualization
+ggplot(pct_NA_variable_OFF, aes(x = variable, y = pct)) + 
+  geom_bar(stat = "identity", color = "black", fill = "grey") + 
+  ggtitle(label = "Many products do not belong to a group food (groupe_1)",
+          subtitle = "Percentage of missing values per variable") +
+  coord_flip() + 
+  labs(x = "variable",
+       y = "% of NA",
+       caption = "Data : OpenFoodFacts") +
+  theme_bw()
+```
+
+Unfortunately, the target variable, groupe_1, is missing in 8 out of 10 products ... However, as nutrients (sugar, salt, proteins, fat, saturated fat and carbohydrates) and product's names are valid in many observations, it seems possible to predict the food group from these inputs. In a matter of simplicity, I will only use nutrients as inputs for a baseline model.
+
+# Some analysis on nutrients
+
+## Distribution of food group in Open Food Facts's database
+
+```{r fig.width=7, fig.height=4}
+
+# Number of products per food group
+n_EAN_by_groupe1 = openfoodfacts %>%
+  filter(!is.na(groupe_1)) %>%
+  group_by(groupe_1) %>%
+  summarise(count = EAN %>% unique() %>% length()) %>%
+  ungroup()
+
+# Sort the groups
+n_EAN_by_groupe1$groupe_1 =  factor(n_EAN_by_groupe1$groupe_1,
+                                    levels = n_EAN_by_groupe1$groupe_1[order(n_EAN_by_groupe1$count)])
+
+
+# Visualization
+ggplot(n_EAN_by_groupe1, aes(x = groupe_1, y = count)) +
+  geom_bar(stat = "identity", color = "black", fill = "grey") + 
+  ggtitle(label = "Many products are sugary snacks",
+          subtitle = "Number of products for each food group (except NA)") +
+  labs(x = "Food group",
+       y = "number of references in the database",
+       caption = "Data : Open Food Facts") + 
+  scale_y_continuous(labels = scales::comma) +
+  coord_flip() + 
+  theme_bw()
+
+```
+
+From the graph below, it appears that the repartition is not uniform : there are more sugary snacks and dairy products than fruits. One should be careful about possible bias when one will predict the food group. 
+
+## Part of missing nutrients per food group
+
+```{r fig.width=10, fig.height=4}
+
+# Percentage of missing nutrients per food group
+pct_NA_groupe_1 = openfoodfacts %>%
+  filter(!is.na(groupe_1)) %>%
+  select(groupe_1, salt_100g, sugars_100g, glucides_100g, fat_100g, proteins_100g, saturatedFat_100g) %>%
+  gather("nutriment", "valeur", -groupe_1) %>% #one gets long format thanks to the package tidyr
+  group_by(groupe_1) %>%
+  summarise(pct_NA = 100 * mean(is.na(valeur))) %>%
+  ungroup()
+
+# Sort the food goup
+pct_NA_groupe_1$groupe_1 = factor(pct_NA_groupe_1$groupe_1, 
+                                  levels = pct_NA_groupe_1$groupe_1[order(pct_NA_groupe_1$pct_NA)])
+
+# Visualization
+ggplot(pct_NA_groupe_1, aes(x = groupe_1, y = pct_NA)) + 
+  geom_bar(stat = 'identity', color = "black", fill = "grey") + 
+  ggtitle(label = "The more a product is processed, the more information you have",
+          subtitle = "Percentage of missing nutrients per food group (salt, sugars, carbohydrate, proteins, fat, saturated fat)") +
+  labs(x = "food groups",
+       y = "% of missing nutrients",
+       caption = "Data : Open Food Facts") +
+  coord_flip() + 
+  theme_bw()
+```
+
+From this graph, it appears that the repartition of missing nutrients is related to the food groups. Indeed, according to the first graph, nutrients are missing in 15-20% of observations. But this detailed analysis proves that the more natural foods, such as fruits, vegetables, fish and meat, have the less information about their nutrients. This fact is evident : this kind of information is not shown on such products.
+Consequently, if the prediction is done only on products providing information of nutrients, one will have less "natural" products. This issue may be resolved by using the name of a product (in a future notebook maybe ...)
+
+## Value of nutrients per food group
+
+It is possible to determine the food group of a product by only using the nutrients ? Let's check this hypothesis by calculating the median values of nutrients for each food group. Using the median instead of the mean makes the results more robust to outliers.
+
+```{r fig.width=12, fig.height=7}
+
+# Median value of nutrients per each food group
+nutriments_median_groupe1 =  openfoodfacts %>%
+  filter(!is.na(groupe_1)) %>%
+  filter(salt_100g <= 100, sugars_100g <= 100, glucides_100g <= 100, 
+         fat_100g <= 100, proteins_100g <= 100, saturatedFat_100g <= 100) %>% #remove some "easy" outliers
+  select(groupe_1, salt_100g, sugars_100g, glucides_100g, fat_100g, proteins_100g, saturatedFat_100g) %>%
+  gather("nutriment", "valeur", -groupe_1) %>% #to long format
+  group_by(nutriment, groupe_1) %>%
+  summarise(valeur_mediane = median(valeur)) %>%
+  ungroup()
+
+# Visualization
+ggplot(nutriments_median_groupe1, aes(x = groupe_1, y = valeur_mediane, fill = groupe_1)) + 
+  geom_bar(stat = "identity") + 
+  ggtitle(label = "Each food group has his own nutrients signature",
+          subtitle = "Median value of nutrients per food group") +
+  labs(x = "food groups",
+       y = "median value of nutrients for 100g of food",
+       caption = "Data : Open Food Facts") + 
+  facet_grid(nutriment ~ .) + #multiple rows
+  theme_bw() + 
+  theme(legend.position = "none") #no legend
+```
+
+According to this analysis, it seems to be possible to predict a product's food group using only the nutrients. Indeed, if a product has a high value of carbohydrates (= glucides in French), it may belong to either "Sugary snacks", "Salty snacks" or "Cereals and potatoes". And if a high value of fat is detected, the product is likely to belong to "Salty snacks".
+
+# Decision tree
+
+From the remark above, it seems natural to use a decision tree based on the value of nutrients. Indeed, if carbohydrates and sugars are high, it is a sugary snacks. Let's build a decision tree (supervised classification task).
+
+## Setting
+
+For this tasks, one will remove the "easy" outliers from the dataset and sample it into two datasets : one for the learning task and the other for the performance measuring.
+
+```{r}
+# Only keeping observations where the food group is valid and removing easy outliers
+openfoodfacts_ml = openfoodfacts %>%
+  filter(!is.na(groupe_1)) %>%
+  filter(salt_100g <= 100, sugars_100g <= 100, glucides_100g <= 100, 
+         fat_100g <= 100, proteins_100g <= 100, saturatedFat_100g <= 100) %>%
+  select(groupe_1, salt_100g, sugars_100g, glucides_100g, fat_100g, proteins_100g, saturatedFat_100g)
+
+# Checking that NA observations are out
+colSums(is.na(openfoodfacts_ml)) %>% sort(decreasing = TRUE)
+
+#Sampling : 80% for train / 20% for test
+sample_size = floor(0.80 * nrow(openfoodfacts_ml))
+
+## set the seed to make your partition reproducible
+set.seed(42)
+train_ind = sample(seq_len(nrow(openfoodfacts_ml)), size = sample_size)
+
+train = openfoodfacts_ml[train_ind, ]
+test = openfoodfacts_ml[-train_ind, ]
+
+cat(sprintf("Among the %.0f observations of the database of Open Food Facts, only %.0f are useful for this methodology.\n
+            \tIn the training dataset, there are %.0f observations.\n
+            \tIn the test dataset, there are %.0f observation", 
+            nrow(openfoodfacts), nrow(openfoodfacts_ml), nrow(train), nrow(test)))
+```
+
+## Learning
+
+Let's fit the model on the training dataset : 
+
+```{r fig.width=8, fig.height=7}
+# Learning phase
+fit = rpart(groupe_1 ~ salt_100g + sugars_100g + glucides_100g + fat_100g + proteins_100g + saturatedFat_100g, 
+            data = train)
+
+# Plot the tree
+rpart.plot(fit, type = 0, box.palette = 0) #type = 0 makes it simplier ; box.palette = 0 removes colors
+```
+
+
+
+## Performance measuring
+
+Let's predict values on the test dataset and measure the accuracy : 
+
+```{r}
+# Prediction
+test$groupe_1_hat = predict(fit, test, type = "class")
+
+# Confusion matrix
+table(test$groupe_1_hat, test$groupe_1)
+
+# Accuracy of the model
+accuracy = 100 * mean(test$groupe_1_hat == test$groupe_1)
+sprintf("Accuracy of the model : %.2f%%.", accuracy)
+```
+
+# Prediction on the Open Food Facts dataset
+
+Now, the model is able to predict, with an accuracy of nearly 70%, the food group of a product given the nutrients. As the nutrients data are available on nearly 75% of the whole dataset, one can get the food group for 75% of products and not only on 20% of products.
+
+## Prediction on the remained observations
+
+One uses the same model.
+
+```{r}
+# Only keeping observations with nutrients
+openfoodfacts_nutrients = openfoodfacts %>%
+  filter(!is.na(salt_100g), !is.na(sugars_100g), !is.na(glucides_100g),
+         !is.na(fat_100g), !is.na(proteins_100g), !is.na(saturatedFat_100g))
+
+cat(sprintf("There are %.0f observations where the nutrients are valid, ie %.2f%% of the original data.\n",
+            nrow(openfoodfacts_nutrients),
+            100 * nrow(openfoodfacts_nutrients)/nrow(openfoodfacts)))
+
+```
+
+Let's predict with the previous model :
+
+```{r}
+# Prediction
+openfoodfacts_nutrients$groupe_1_hat = predict(fit, openfoodfacts_nutrients, type = "class") %>% as.character()
+
+# If the group is given, one will keep it
+openfoodfacts_nutrients$food_group = ifelse(is.na(openfoodfacts_nutrients$groupe_1), #if the group is missing
+                                            openfoodfacts_nutrients$groupe_1_hat, #we use the prediction
+                                            openfoodfacts_nutrients$groupe_1) #otherwise, we use the group
+
+
+```
+
+## Some analysis of the model
+
+Is there any bias ?
+
+```{r}
+# Number of products per food group if the nutrients are given
+n_EAN_by_groupe1_if_nutrients = openfoodfacts_nutrients %>%
+  filter(!is.na(groupe_1)) %>%
+  group_by(groupe_1) %>%
+  summarise(count_before = EAN %>% unique() %>% length()) %>%
+  ungroup()
+
+
+# Number of products per food group after data imputation
+n_EAN_by_groupe1_after_imputation = openfoodfacts_nutrients %>%
+  group_by(food_group) %>%
+  summarise(count_after = EAN %>% unique() %>% length()) %>%
+  ungroup()
+
+# Join
+n_EAN_by_groupe_1_before_after = n_EAN_by_groupe1_if_nutrients %>%
+  left_join(n_EAN_by_groupe1_after_imputation, by = c("groupe_1" = "food_group"))
+
+# Visualisation before-after
+ggplot(n_EAN_by_groupe_1_before_after, aes(x = count_before, y = count_after)) + 
+  geom_point() + 
+  geom_text_repel(aes(label = groupe_1), size = 3) +
+  ggtitle(label = "Popular food groups keep being popular",
+          subtitle = "Number of products per food group, before and after imputation") + 
+  labs(x = "number of products before data imputation",
+       y = "number of products after data imputation") + 
+  scale_y_continuous(labels = scales::comma) +
+  theme_bw()
+
+```
+
+The graph below shows a proportional link : the more products a food group has, the more products it continues to have. The fact that the relation is linear shows that the groupe_1 is forgotten randomly and does not depend on the kind of product.
+
+# Perspectives
+
+This model is only a baseline. It relies on six nutrients and only predict the groupe_1 (and not the pnns_groups_2, which is more precise). Moreover, the model is not fine-tuned (hyper-parameters, pruning, data engineering, ...) and using more features and more complex models may improve the results. 
+
+The last but not the least : we should verify that the predicted food group is coherent with the product's name in the case where the groupe_1 was not defined previously, in order to detect any bias.
+
+Keep free to improve the model =)

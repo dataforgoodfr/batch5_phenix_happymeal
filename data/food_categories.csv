@@ -1,0 +1,13 @@
+code_cat1;code_cat2;label_cat2
+0;0;Exclus
+10;11;Viande, œufs
+10;12;Poisson
+20;20;Produits gras sucrés salés
+30;30;Matières grasses ajoutées
+40;41;Produits laitiers (hors fromage)
+40;42;Fromage
+50;51;Féculents raffinés
+50;52;Féculents non raffinés
+60;61;Fruits
+60;62;Légumes
+70;70;Plats préparés
