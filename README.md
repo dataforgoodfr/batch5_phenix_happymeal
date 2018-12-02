@@ -9,7 +9,7 @@ In the following workflow, EAN means European Article Number and OFF Open Food F
 
 ![Image](Input2BalancedMeals.jpg "icon")
 
-(Source code of this workflow can be found [here](Input2BalancedMeals.xml))
+(The source code of this workflow can be found [here](Input2BalancedMeals.xml))
 
 ### Matching
 We used the Naive Bayes method in order to automatically assign categories to articles according to their names.
@@ -18,9 +18,9 @@ We used the Random Forest method (40 trees) to automatically assign categories t
 ### Defining weights in grams
 This algorithm works as follow: 
 
-- If the quantity is mentioned in OFF, then convert the quantity in grams
-    - if not, then compute the average of article's category quantity
-- If the article rice, semolina, pasta or instant mashed potatoes, then multiply by a specific coefficient
+- If the quantity is mentioned in OFF, then converts the quantity in grams
+    - if not, then compute the average of article's category quantities
+- If the article is rice, semolina, pasta or instant mashed potatoes, then multiply by a specific coefficient
 ### Optimizer
 Description can be found [here](https://github.com/dataforgoodfr/batch5_phenix_happymeal/tree/master/algos-optimisation).
 ### Reallocating remaining articles
