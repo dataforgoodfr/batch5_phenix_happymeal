@@ -11,14 +11,7 @@ __version__ = '0.1'
 __maintainer__ = 'François-Guillaume Fernandez'
 __status__ = 'Development'
 
-import argparse
 import pandas as pd
-
-
-parser = argparse.ArgumentParser()
-# Simulation-related
-parser.add_argument('csv_file', type=str, help='The location of the CSV file to parse')
-args = parser.parse_args()
 
 
 def extract_qty_info(s, sep=','):
@@ -42,14 +35,3 @@ def parse_listing(csv_path):
     df['product_qty'] = df.product_info.apply(lambda s: extract_qty_info(s))
 
     return df
-
-
-def main():
-
-    df = parse_listing(args.csv_file)
-
-    print(df)
-
-
-if __name__ == '__main__':
-    main()

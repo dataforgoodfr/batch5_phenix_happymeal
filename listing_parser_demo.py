@@ -12,19 +12,20 @@ __maintainer__ = 'François-Guillaume Fernandez'
 __status__ = 'Development'
 
 import argparse
-from pprint import pprint
-from utils.off_mgt import get_product_information
+from io_mgt.listing_parser import parse_listing
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("barcode", type=str, help="Enter the barcode you want to analyze")
+# Simulation-related
+parser.add_argument('csv_file', type=str, help='The location of the CSV file to parse')
 args = parser.parse_args()
 
 
 def main():
-    # Retrieve result
-    product_information = get_product_information(args.barcode)
-    pprint(product_information)
+
+    df = parse_listing(args.csv_file)
+
+    print(df)
 
 
 if __name__ == '__main__':

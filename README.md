@@ -7,9 +7,9 @@ The main goal of this repository is to create balanced meals from a list of prod
 
 In the following workflow, EAN means European Article Number and OFF Open Food Facts.
 
-![Image](Input2BalancedMeals.jpg "icon")
+![Image](static/Input2BalancedMeals.jpg "icon")
 
-(The source code of this workflow can be found [here](Input2BalancedMeals.xml))
+(The source code of this workflow can be found [here](static/Input2BalancedMeals.xml))
 
 ### Matching
 We used the Naive Bayes method in order to automatically assign categories to articles according to their names.

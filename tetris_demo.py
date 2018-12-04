@@ -13,7 +13,7 @@ __status__ = 'Development'
 
 import argparse
 import numpy as np
-from grouping import create_batches
+from meal_balancer.grouping import create_batches
 
 cat_distrib = dict(A=0.05, B=0.3, C=0.5, D=0.15)
 
