@@ -59,20 +59,29 @@
 * <a href="https://www.codecogs.com/eqnedit.php?latex=$\forall&space;m,&space;\forall&space;c,&space;\sum_{p&space;\in&space;c}&space;q_{m,p}&space;\times&space;w_{p}&space;\geq&space;(\tau_{c}&space;-&space;\delta$)&space;\times&space;W" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$\forall&space;m,&space;\forall&space;c,&space;\sum_{p&space;\in&space;c}&space;q_{m,p}&space;\times&space;w_{p}&space;\geq&space;(\tau_{c}&space;-&space;\delta$)&space;\times&space;W" title="$\forall m, \forall c, \sum_{p \in c} q_{m,p} \times w_{p} \geq (\tau_{c} - \delta$) \times W" /></a>: *c* proportion in meal *m* must be greater than
 * <a href="https://www.codecogs.com/eqnedit.php?latex=$\forall&space;m,&space;\forall&space;c,&space;\sum_{p&space;\in&space;c}&space;q_{m,p}&space;\times&space;w_{p}&space;\leq&space;(\tau_{c}&space;&plus;&space;\delta$)&space;\times&space;W" target="_blank"><img src="https://latex.codecogs.com/gif.latex?$\forall&space;m,&space;\forall&space;c,&space;\sum_{p&space;\in&space;c}&space;q_{m,p}&space;\times&space;w_{p}&space;\leq&space;(\tau_{c}&space;&plus;&space;\delta$)&space;\times&space;W" title="$\forall m, \forall c, \sum_{p \in c} q_{m,p} \times w_{p} \leq (\tau_{c} + \delta$) \times W" /></a>: *c* proportion in meal *m* must be lower than
 
-### Methodes exactes - beaucoup trop lentes
+### Install non-commercial solver (alternative to gurobi)
 
-### Methodes heuristiques - probablement trop lentes aussi ???
+If conda is not already installed, install anaconda or miniconda
+For example under linux
+```
+curl -O https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh
+source .bashrc
+```
+Other OS: https://conda.io/docs/user-guide/install/index.html
+Warning: Anaconda will take up 3 GB of disk space, so better install Miniconda
 
-Par exemple, Local Search : voir `panier_localsearch.py`
-
-Points d'amelioration :
-
-* initialisation 
-
-* cost function
-
-* choice of neighbourhood moves
-
-* stopping criterion
-
-### Solution possible : initialisation par approche tres approximative + amelioration par methode heuristique ?
+Now install glpk (LP and MIP solver) + cvxopt (python wrapper) + cvxpy (python wrapper)
+```
+# install glpk
+conda install -c conda-forge glpk
+# check if glpk is installed
+glpsol -v
+# install cvxopt
+conda install -c conda-forge cvxopt
+# check if cvxopt is able to find glpk by running 'from cvxopt.glpk import ilp' in python interpretor
+# install cvxpy
+conda install -c conda-forge lapack
+conda install -c cvxgrp cvxpy
+# check if cvxpy is able to find glpk and cvxopt by running milp_cvxpy_glpk.py
+```
