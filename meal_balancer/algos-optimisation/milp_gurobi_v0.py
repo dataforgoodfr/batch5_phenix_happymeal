@@ -5,7 +5,7 @@
 MILP for balanced meal creation
 Requires for a gurobi license
 Example of use : 
-python "algos-optimisation/milp_gurobi.py" "data/intermediate/sample_offres_qty.csv" "data/intermediate/happy_meals.csv" 10 0.1 1000
+python "meal_balancer/algos-optimisation/milp_gurobi.py" "data/intermediate/sample_offres_qty.csv" "data/intermediate/happy_meals.csv" 10 0.1 1000
 '''
 
 __author__ = 'Julie Seguela'
@@ -23,7 +23,7 @@ from gurobipy import *
 time_limit = 600
 display_interval = 30
 
-cat_distrib = {1: 0.12, 2: 0.025, 3: 0.025, 4: 0.25, 5: 0.25, 6: 0.33}
+cat_distrib = {10: 0.12, 20: 0.025, 30: 0.025, 40: 0.25, 50: 0.25, 60: 0.33}
 cat_mapping_file = "data/mapping_pnnsgroups2.csv"
 
 #listing_in = "data/intermediate/sample_offres_qty.csv"
@@ -50,17 +50,17 @@ mapping = pd.read_csv(cat_mapping_file, sep = ";")
 df_in = df_in.merge(mapping, how = "inner", on = "pnns_groups_2")
 
 # Remove non eligible products
-df_in = df_in.loc[df_in['code_cat'] != 0,]
+df_in = df_in.loc[~df_in['code_cat1'].isin([0, 70]),]
 
 # Extract product quantity in grams
 # to be done
 
 # Build product dictionary: agregate by product with keeping names
 pdt_info_df = df_in
-pdt_info_df['QuantiteValeur'] = pdt_info_df.groupby(['EAN', 'code_cat', 'qty_gram'])['QuantiteValeur'] \
+pdt_info_df['QuantiteValeur'] = pdt_info_df.groupby(['EAN', 'code_cat1', 'qty_gram'])['QuantiteValeur'] \
                                            .transform('sum')
-pdt_info_df = pdt_info_df[['EAN', 'Nom', 'code_cat', 'pnns_groups_2', 'qty_gram', 'QuantiteValeur']] \
-                         .drop_duplicates(['EAN', 'code_cat', 'qty_gram']) \
+pdt_info_df = pdt_info_df[['EAN', 'Nom', 'code_cat1', 'pnns_groups_2', 'qty_gram', 'QuantiteValeur']] \
+                         .drop_duplicates(['EAN', 'code_cat1', 'qty_gram']) \
                          .reset_index(drop = True)
 
 pdt_info_dict = pdt_info_df.to_dict()
@@ -87,13 +87,13 @@ hm.addConstrs((x.sum('*', pdt) <= pdt_info_dict['QuantiteValeur'][pdt]\
 
 # Constraint: can't oversize or undersize a category too much
 hm.addConstrs(quicksum((x[meal, pdt] * pdt_info_dict['qty_gram'][pdt]) \
-                       for pdt in pdt_domain if pdt_info_dict['code_cat'][pdt] == cat) \
+                       for pdt in pdt_domain if pdt_info_dict['code_cat1'][pdt] == cat) \
               <= (cat_distrib[cat] + delta_auth) * meal_size\
               for cat in cat_domain \
               for meal in meal_domain)
 
 hm.addConstrs(quicksum((x[meal, pdt] * pdt_info_dict['qty_gram'][pdt]) \
-                       for pdt in pdt_domain if pdt_info_dict['code_cat'][pdt] == cat) \
+                       for pdt in pdt_domain if pdt_info_dict['code_cat1'][pdt] == cat) \
               >= (cat_distrib[cat] - delta_auth) * meal_size\
               for cat in cat_domain \
               for meal in meal_domain)
