@@ -3,10 +3,6 @@ import numpy as np
 import pandas as pd
 import sys
 sys.path.insert(0,'../..')
-from utils.off_mgt import convert_quantity
-from sklearn.preprocessing import LabelEncoder
-
-# ** work in progress **
 
 # optimisation algorithm for balanced meal creation
 # cvxpy + glpk implementation of Julie Seguela's gurobi implementation
@@ -18,15 +14,68 @@ __maintainer__ = 'Aoife Fogarty'
 __status__ = 'Development'
 
 
-def main():
+def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_size):
+    '''
+    Args:
+        listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
+        cat_distrib (dict??): ideal distribution XXX
+        delta_auth (float): max authorised difference between ideal and actual category distributions
+        meal_size (float): ??max weight in grams of one basket
+    Return:
+        df with details of products in each basket, after optimized distribution
+        df with details of products left undistributed after optimized distribution
+        json with details of distributed and undistributed products, for plotting in UI
+    '''
 
-    # TODO replace with more realistic distribution for tests
-    cat_distrib = {1: 0.11, 2: 0.02, 3: 0.02, 4: 0.2, 5: 0.25, 6: 0.32, 7: 0.01,
-                   8: 0.005, 9: 0.005, 10: 0.05, 11: 0.01}
-    n_categories = max(cat_distrib.keys())
-    delta_auth = 0.05
-    meal_size = 1400
-    n_meals = 10
+    # initial estimation of min and max number of meals we can make
+    # TODO 
+    n_meals_min = 0
+    n_meals_max = 1
+
+    for n_meals in range(n_meals_min, n_meals_max+1, 1):
+
+        solution = optimize_baskets_for_mealsize(listing_df, cat_distrib, n_meals, delta_auth, meal_size):
+
+        if solution is None:
+            # we have reached the max possible number of meals
+            break
+
+        # TODO deal with case where even n_meals_min doesn't give a viable solution
+
+    # postprocess solution to get jsons for plotting
+    results_json = {}
+    # results_json = postprocess_optimised_solution(solution)
+
+    return df_distributed, df_undistributed, results_json
+
+
+def load_meal_balancing_parameters(filename):
+    '''
+    Args:
+        filename (str): containing preset parameters
+    '''
+
+    # TODO
+
+    return cat_distrib, delta_auth, meal_size
+
+
+def optimize_baskets_for_mealsize(listing_df, cat_distrib, n_meals, delta_auth, meal_size):
+    '''
+    For a given mealsize, get the distribution of products into
+    baskets/meals that best corresponds to a given distribution of
+    categories in each basket
+
+    Args:
+        listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
+        cat_distrib (dict??): ideal distribution XXX
+        delta_auth (float): max authorised difference between ideal and actual category distributions
+        meal_size (float): ??max weight in grams of one basket
+        n_meals (int): number of baskets to construct
+    Returns:
+        solution matrix if a solution could be found for this value of n_meals
+        Otherwise returns None
+    '''
 
     # use the delta parameter to set allowed upper and lower
     # limits to the category distribution of each basket
@@ -35,17 +84,35 @@ def main():
     cat_distrib_lower = {k: (v - delta_auth) * meal_size
                          for (k,v) in cat_distrib.items()}
 
-    use_real_test_data = True
+    timeout = 1000
 
-    if use_real_test_data:
-        # load real test data
-        filename = 'sample_offres.csv'
-        pdt_info_dict = load_real_test_data(filename)
-        n_products = len(pdt_info_dict)
+    # construct an optimised n_meals * n_products matrix
+    solution_matrix = solver_cvxpy_glpk(??, timeout)
+    #solution_matrix = solver_gurobi()
+
+    if solution:
+        return solution_matrix
     else:
-        # create random fake test data
-        n_products = 100
-        pdt_info_dict = create_fake_test_data(n_products, n_meals, n_categories)
+        return None
+
+
+def postprocess_optimised_solution(solution):
+    '''
+    Process solution matrix (output of MILP solver)
+    to get json for plotting in UI
+    '''
+    pass
+
+
+def solver_cvxpy_glpk(n_meals, cat_distrib, listing_df):
+    '''
+    Returns:
+        integer matrix of dimensions n_meals * n_products
+        Each matrix element is the number of items of a product in a basket
+    '''
+
+    n_products = ??
+    weights = ??
 
     meal_domain = np.arange(0, n_meals, step = 1)
     pdt_domain = np.arange(0, n_products, step = 1)
@@ -92,67 +159,6 @@ def main():
     print(prob.solve(solver='GLPK_MI',verbose = True))
     #prob.solve(solver=cvx.GLPK_MI)
 
+    solution = 0
 
-def create_fake_test_data(n_products, n_meals, n_categories):
-    '''
-    create n_products products with random weights and categories and
-    number of items
-    '''
-
-    # weight of each item
-    max_item_weight = 200
-    weights = np.random.random(size=n_products) * max_item_weight + 1.0
-
-    # category of each item
-    categories = np.random.random_integers(low=1, high=n_categories, size=n_products)
-
-    # number of items of each product 
-    # (based on observed data it is something like an exponential distribution)
-    n_items = np.random.exponential(scale=2.0, size=n_products)
-
-    pdt_info_dict = {'qty_gram': weights, 'code_cat': categories, 'n_items': n_items}
-
-    return pdt_info_dict
-
-
-def load_real_test_data(filename):
-    '''
-    Parse csv file extracted from Offres table in Phenix database
-    Warning: not all weights are correctly parsed yet
-    Temporary function for testing and benchmarking MILP algos
-    '''
-
-    # category to use for tests
-    category_to_use = 'pnns_groups_1'
-
-    df = pd.read_csv(filename, sep=',', encoding='iso-8859-1')
-    df = df[~df[category_to_use].isnull()]
-
-    # get weight in grams of each product
-    df['weight_per_entry'] = df.quantity_off.apply(lambda s: convert_quantity(s))
-    df = pd.concat([df.drop(['weight_per_entry'], axis=1), df['weight_per_entry'].apply(pd.Series)], axis=1)
-    df = df[~df['val'].isnull()]
-    df = df.rename(columns={'val': 'qty_gram'})
-
-    # encode category of each product as an integer
-    le = LabelEncoder()
-    df['code_cat'] = le.fit_transform(df[category_to_use].values)
-    # TODO return le.classes_ (label of each integer class) for later use
-
-    # regroup duplicate products
-    df['QuantiteValeur'] = df.groupby(['EAN', 'code_cat', 'qty_gram'])['QuantiteValeur'] \
-                             .transform('sum') \
-                             .astype(int)
-    # Note: in some very rare cases QuantiteValeur is not an integer, 
-    # but we neglect this
-    df = df[['EAN', 'Nom', 'code_cat', category_to_use, 'qty_gram', 'QuantiteValeur']] \
-                         .drop_duplicates(['EAN', 'code_cat', 'qty_gram']) \
-                         .reset_index(drop = True)
-
-    df = df[df['QuantiteValeur'] > 0]
-
-    return df.to_dict(orient='list')
-
-
-if __name__ == '__main__':
-    main()
+    return solution
