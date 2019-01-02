@@ -14,8 +14,10 @@ __status__ = 'Development'
 import argparse
 import numpy as np
 from meal_balancer.grouping import create_batches
+from meal_balancer.balance_adjuster import missing_balance, tier_completion
 
 cat_distrib = dict(A=0.05, B=0.3, C=0.5, D=0.15)
+categ_price = dict(A=5., B=3.25, C=11.24, D=0.74)
 
 parser = argparse.ArgumentParser()
 # Simulation-related
@@ -49,6 +51,11 @@ def main():
     print('Number of remaining items: %s portioned, %s unportioned' % (sum([len(b) for p in storage.values() for b in p.items]), sum([len(l) for l in tmp_items.values()])))
     print('Number of large items: %s' % len(big_items))
     print('Number of unindentified items: %s' % len(unidentified))
+
+    required_portions = missing_balance(storage, cat_distrib.keys())
+    meal_prices, nb_meals = tier_completion(required_portions, categ_price, args.portion_size)
+    for idx, nb_meal in enumerate(nb_meals):
+        print('%s meals at %s' % (nb_meal, meal_prices[idx]))
 
 
 if __name__ == '__main__':

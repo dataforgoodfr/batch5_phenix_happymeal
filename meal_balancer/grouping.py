@@ -79,6 +79,11 @@ def create_batches(items, balanced_split, batch_qty, overflow_thresh=0., underfl
         underflow_thresh (float): minimum undeflowing quantity accepted
     Returns:
         all_batches (list): list of batches containing the indexes of items
+        storage (dict): remaining categorized batches
+        big_items (dict): items that were too big to be matched
+        unidentified (dict): items whose categories couldn't be matched against the ideal distribution
+        tmp_items (dict): items that could not form a batch
+        loss (float): L2 loss of meal against ideal split
     """
 
     # theoretical_limit = int(sum([item['quantity'] for item in items]) / batch_qty)
