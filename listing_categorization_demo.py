@@ -13,6 +13,7 @@ __status__ = 'Development'
 import argparse
 from pprint import pprint
 import pandas as pd
+from io_mgt import listing_import as li
 from preprocessing import categorization as ct
 
 
@@ -30,9 +31,7 @@ model_matching_file   = 'data/clf_names_nb_light.sav'
 
 def main():
     # Read food listing file
-    input_listing = pd.read_csv('data/'+ listing_file, sep=';', encoding='UTF-8', dtype = {'EAN': object})
-    input_listing.rename(columns={'PRODUIT / LIBELLE': 'Produit_Nom', 'QUANTITE': 'quantity'}, 
-                         inplace=True)
+    input_listing = li.importListing(listing_file)
 
     # Add food category to the data frame
     input_listing = ct.get_foodGroupFromToDF(input_listing, 
