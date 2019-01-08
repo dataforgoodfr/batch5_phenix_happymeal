@@ -14,8 +14,6 @@ __status__ = 'Development'
 import sys
 import pandas as pd
 
-listing_file = 'commande_94349.csv'
-
 
 def importListing(csv_file, 
                   EAN_col = 'EAN',  
