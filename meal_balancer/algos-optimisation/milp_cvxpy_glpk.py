@@ -14,39 +14,40 @@ __maintainer__ = 'Aoife Fogarty'
 __status__ = 'Development'
 
 
-def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_size):
+def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight):
     '''
     Args:
         listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
-        cat_distrib (dict??): ideal distribution XXX
+        cat_distrib (dict): ideal distribution, keys=categories
         delta_auth (float): max authorised difference between ideal and actual category distributions
-        meal_size (float): ??max weight in grams of one basket
+        meal_weight (float): ideal weight in grams of one basket
     Return:
-        df with details of products in each basket, after optimized distribution
-        df with details of products left undistributed after optimized distribution
+        df with details of products in each basket after optimized distribution, df has column 'allocated_basket' with value of 0 if item was not distributed
         json with details of distributed and undistributed products, for plotting in UI
     '''
 
     # initial estimation of min and max number of meals we can make
-    # TODO 
-    n_meals_min = 0
-    n_meals_max = 1
+    # TODO
+    n_meals_min = 10
+    n_meals_max = 20
 
     for n_meals in range(n_meals_min, n_meals_max+1, 1):
 
-        solution = optimize_baskets_for_mealsize(listing_df, cat_distrib, n_meals, delta_auth, meal_size):
+        solution = optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, meal_weight):
 
         if solution is None:
+            # solver could not find an optimal solution
             # we have reached the max possible number of meals
             break
 
         # TODO deal with case where even n_meals_min doesn't give a viable solution
 
     # postprocess solution to get jsons for plotting
+    df_solution = postprocess_optimised_solution(solution)
     results_json = {}
-    # results_json = postprocess_optimised_solution(solution)
+    # results_json = postprocess_optimised_solution_df(solution_df)
 
-    return df_distributed, df_undistributed, results_json
+    return df_solution, results_json
 
 
 def load_meal_balancing_parameters(filename):
@@ -57,20 +58,20 @@ def load_meal_balancing_parameters(filename):
 
     # TODO
 
-    return cat_distrib, delta_auth, meal_size
+    return cat_distrib, delta_auth, meal_weight
 
 
-def optimize_baskets_for_mealsize(listing_df, cat_distrib, n_meals, delta_auth, meal_size):
+def optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, meal_weight):
     '''
-    For a given mealsize, get the distribution of products into
-    baskets/meals that best corresponds to a given distribution of
+    For a given number of meals (n_meals), get the distribution of products
+    into baskets/meals that best corresponds to a given distribution of
     categories in each basket
 
     Args:
         listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
         cat_distrib (dict??): ideal distribution XXX
         delta_auth (float): max authorised difference between ideal and actual category distributions
-        meal_size (float): ??max weight in grams of one basket
+        meal_weight (float): ideal weight in grams of one basket
         n_meals (int): number of baskets to construct
     Returns:
         solution matrix if a solution could be found for this value of n_meals
@@ -79,15 +80,15 @@ def optimize_baskets_for_mealsize(listing_df, cat_distrib, n_meals, delta_auth, 
 
     # use the delta parameter to set allowed upper and lower
     # limits to the category distribution of each basket
-    cat_distrib_upper = {k: (v + delta_auth) * meal_size
+    cat_distrib_upper = {k: (v + delta_auth) * meal_weight
                          for (k,v) in cat_distrib.items()}
-    cat_distrib_lower = {k: (v - delta_auth) * meal_size
+    cat_distrib_lower = {k: (v - delta_auth) * meal_weight
                          for (k,v) in cat_distrib.items()}
 
     timeout = 1000
 
     # construct an optimised n_meals * n_products matrix
-    solution_matrix = solver_cvxpy_glpk(??, timeout)
+    solution_matrix = solver_cvxpy_glpk(??)
     #solution_matrix = solver_gurobi()
 
     if solution:
@@ -99,6 +100,23 @@ def optimize_baskets_for_mealsize(listing_df, cat_distrib, n_meals, delta_auth, 
 def postprocess_optimised_solution(solution):
     '''
     Process solution matrix (output of MILP solver)
+    to get dataframe with allocation of items to baskets
+
+    Note that the output contains one line per item, and not one
+    line per product as in other dataframes earlier in the workflow
+
+    Input:
+        solution (matrix) n_meals * n_products
+    Returns:
+        dataframe with one line for each item, and column
+        'allocated_basket' (0 if item was not allocated)
+    '''
+    pass
+
+
+def postprocess_optimised_solution_df(solution_df):
+    '''
+    Process solution dataframe (with allocation of items to baskets)
     to get json for plotting in UI
     '''
     pass
@@ -155,10 +173,18 @@ def solver_cvxpy_glpk(n_meals, cat_distrib, listing_df):
     prob = cvx.Problem(objective, constraints)
 
     print(prob)
-    #print(prob.solve())
-    print(prob.solve(solver='GLPK_MI',verbose = True))
-    #prob.solve(solver=cvx.GLPK_MI)
+
+    parameters = {'tm_lim' : 1000}
+    try:
+        solution = prob.solve(solver='GLPK_MI',verbose = True, solver_specific_opts=parameters)
+    except DCPError:
+        print('Problem is not Disciplined Convex Programming compliant')
+    except SolverError:
+        print('No suitable solver exists among the installed solvers, or an unanticipated error has been encountered')
 
     solution = 0
+
+    if timeout:
+        return None
 
     return solution
