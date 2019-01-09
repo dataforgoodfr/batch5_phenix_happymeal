@@ -28,7 +28,7 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight):
 
     # initial estimation of min and max number of meals we can make
     # TODO
-    n_meals_min = 10
+    n_meals_min = 1
     n_meals_max = 20
 
     for n_meals in range(n_meals_min, n_meals_max+1, 1):
@@ -85,11 +85,12 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, me
     cat_distrib_lower = {k: (v - delta_auth) * meal_weight
                          for (k,v) in cat_distrib.items()}
 
-    timeout = 1000
-
     # construct an optimised n_meals * n_products matrix
     solution_matrix = solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     #solution_matrix = solver_gurobi()
+
+    print(solution_matrix)
+    quit()
 
     if solution:
         return solution_matrix
@@ -129,9 +130,12 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
         Each matrix element is the number of items of a product in a basket
     '''
 
+    print('Trying to find solution for {} meals'.format(n_meals))
+
     n_products = len(listing_df)
     weights = listing_df['weight_grams'].values
     categories = listing_df['codeAlim_2'].values
+    quantities = listing_df['quantity'].values
 
     meal_domain = np.arange(0, n_meals, step = 1)
     pdt_domain = np.arange(0, n_products, step = 1)
@@ -152,7 +156,8 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     constraints = []
 
     # Constraint: each product can only be in one basket or no basket
-    constraints.append(cvx.sum(X, axis = 1) <= 1)
+    #constraints.append(cvx.sum(X, axis = 1) <= quantities)
+    constraints.append(X >= 0)
 
     # Constraint: limit difference between actual and ideal category distributions
     category_constraints = [cvx.sum(list(X[meal, pdt] * weights[pdt] \
@@ -173,19 +178,19 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
 
     prob = cvx.Problem(objective, constraints)
 
-    print(prob)
-
     parameters = {'tm_lim' : 10}
+    error = False
     try:
         solution = prob.solve(solver='GLPK_MI',verbose = True, solver_specific_opts=parameters)
     except DCPError:
         print('Problem is not Disciplined Convex Programming compliant')
+        error = True
     except SolverError:
         print('No suitable solver exists among the installed solvers, or an unanticipated error has been encountered')
+        error = True
 
-    solution = 0
-
-    if timeout:
+    print(X.value)
+    if error:
         return None
 
-    return solution
+    return X

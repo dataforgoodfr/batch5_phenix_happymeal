@@ -19,6 +19,7 @@ def main():
     # categories are listed in data/food_categories.csv
     # TODO replace with real distribution
     cat_distrib = {10: 0.11, 20: 0.11, 30: 0.11, 40: 0.11, 50: 0.11, 60: 0.11, 70: 0.34}
+    cat_distrib = {10: 0.5, 20: 0.5}
 
     n_categories = len(cat_distrib)
 
@@ -33,7 +34,7 @@ def main():
     # filename = 'meal_balancing_parameters.json'
     # cat_distrib, delta_auth, meal_size = load_meal_balancing_parameters(filename)
 
-    df_listing = pd.read_csv(filename)
+    df_listing = pd.read_csv(filename, sep=';', decimal=',')
 
     # TODO (temporary fix until we have the weights function) add random weights
     n_products = len(df_listing)
