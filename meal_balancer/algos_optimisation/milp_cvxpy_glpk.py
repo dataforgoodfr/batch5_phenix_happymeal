@@ -33,7 +33,7 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight):
 
     for n_meals in range(n_meals_min, n_meals_max+1, 1):
 
-        solution = optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, meal_weight):
+        solution = optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, meal_weight)
 
         if solution is None:
             # solver could not find an optimal solution
@@ -69,7 +69,7 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, me
 
     Args:
         listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
-        cat_distrib (dict??): ideal distribution XXX
+        cat_distrib (dict): ideal distribution XXX
         delta_auth (float): max authorised difference between ideal and actual category distributions
         meal_weight (float): ideal weight in grams of one basket
         n_meals (int): number of baskets to construct
@@ -88,7 +88,7 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, me
     timeout = 1000
 
     # construct an optimised n_meals * n_products matrix
-    solution_matrix = solver_cvxpy_glpk(??)
+    solution_matrix = solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     #solution_matrix = solver_gurobi()
 
     if solution:
@@ -122,19 +122,20 @@ def postprocess_optimised_solution_df(solution_df):
     pass
 
 
-def solver_cvxpy_glpk(n_meals, cat_distrib, listing_df):
+def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
     '''
     Returns:
         integer matrix of dimensions n_meals * n_products
         Each matrix element is the number of items of a product in a basket
     '''
 
-    n_products = ??
-    weights = ??
+    n_products = len(listing_df)
+    weights = listing_df['weight_grams'].values
+    categories = listing_df['codeAlim_2'].values
 
     meal_domain = np.arange(0, n_meals, step = 1)
     pdt_domain = np.arange(0, n_products, step = 1)
-    cat_domain = list(cat_distrib.keys())
+    cat_domain = list(cat_distrib_upper.keys())
 
     #########################
     ## System specifiction ##
@@ -145,8 +146,8 @@ def solver_cvxpy_glpk(n_meals, cat_distrib, listing_df):
 
     # Objective function: maximize the weight in the baskets
     # (note: cvx.multiply is element-wise multiplication)
-    weights = np.tile(weights, (n_meals, 1))  # shape n_meals * n_products
-    objective = cvx.Maximize(cvx.sum(cvx.multiply(X, weights)))
+    weights_matrix = np.tile(weights, (n_meals, 1))  # shape n_meals * n_products
+    objective = cvx.Maximize(cvx.sum(cvx.multiply(X, weights_matrix)))
 
     constraints = []
 
@@ -154,17 +155,17 @@ def solver_cvxpy_glpk(n_meals, cat_distrib, listing_df):
     constraints.append(cvx.sum(X, axis = 1) <= 1)
 
     # Constraint: limit difference between actual and ideal category distributions
-    category_constraints = [cvx.sum(list(X[meal, pdt] * pdt_info_dict['qty_gram'][pdt] \
+    category_constraints = [cvx.sum(list(X[meal, pdt] * weights[pdt] \
                                     for pdt in pdt_domain \
-                                    if pdt_info_dict['code_cat'][pdt] == cat)) \
+                                    if categories[pdt] == cat)) \
                   <= cat_distrib_upper[cat]\
                   for cat in cat_domain \
                   for meal in meal_domain]
     constraints.extend(category_constraints)
 
-    category_constraints = [cvx.sum(list(X[meal, pdt] * pdt_info_dict['qty_gram'][pdt] \
+    category_constraints = [cvx.sum(list(X[meal, pdt] * weights[pdt] \
                                     for pdt in pdt_domain \
-                                    if pdt_info_dict['code_cat'][pdt] == cat)) \
+                                    if categories[pdt] == cat)) \
                   >= cat_distrib_lower[cat]\
                   for cat in cat_domain \
                   for meal in meal_domain]
@@ -174,7 +175,7 @@ def solver_cvxpy_glpk(n_meals, cat_distrib, listing_df):
 
     print(prob)
 
-    parameters = {'tm_lim' : 1000}
+    parameters = {'tm_lim' : 10}
     try:
         solution = prob.solve(solver='GLPK_MI',verbose = True, solver_specific_opts=parameters)
     except DCPError:
