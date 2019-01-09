@@ -1,13 +1,13 @@
-code_cat1;code_cat2;label_cat2
-0;0;Exclus
-10;11;Viande, œufs
-10;12;Poisson
-20;20;Produits gras sucrés salés
-30;30;Matières grasses ajoutées
-40;41;Produits laitiers (hors fromage)
-40;42;Fromage
-50;51;Féculents raffinés
-50;52;Féculents non raffinés
-60;61;Fruits
-60;62;Légumes
-70;70;Plats préparés
+code_cat1;code_cat2;labelAlim2;weigth_grams;ideal_distrib1;ideal_distrib2
+0;0;Exclus;0;0;
+10;11;Viande, œufs;200;0.12;
+10;12;Poisson;200;0.12;0.25
+20;20;Produits gras sucrés salés;200;0.025;
+30;30;Matières grasses ajoutées;200;0.025;
+40;41;Produits laitiers (hors fromage);500;0.25;
+40;42;Fromage;300;0.25;0.1
+50;51;Féculents raffinés;500;0.25;
+50;52;Féculents non raffinés;500;0.25;0.5
+60;61;Fruits;200;0.33;0.5
+60;62;Légumes;200;0.33;
+70;70;Plats préparés;300;0;
