@@ -1,4 +1,4 @@
-code_cat1;code_cat2;labelAlim2;weigth_grams;ideal_distrib1;ideal_distrib2
+codeAlim_1;codeAlim_2;labelAlim_2;weigth_grams;idealDistrib_1;idealDistrib_2
 0;0;Exclus;0;0;
 10;11;Viande, œufs;200;0.12;
 10;12;Poisson;200;0.12;0.25
