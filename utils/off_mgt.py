@@ -16,6 +16,13 @@ import math
 import re
 import pandas as pd
 
+GRAM_CONVERSION_TABLE = dict(g=1.0, gr=1.0, kg=1000., mg=1e-3, gal=3785.41, egg=50.0, portion=100.,
+                             l=1000., ml=1., cl=10., dl=100., oz=28.3495, lb=453.592)
+
+solid_units = ['g', 'gr', 'mg', 'kg', 'lb', 'pound', 'oz']
+liquid_units = ['l', 'litre', 'ml', 'cl', 'gal', 'gallon']
+ALL_UNITS = solid_units + liquid_units
+
 
 def get_product_information(barcode):
     """
@@ -45,6 +52,7 @@ def get_product_information(barcode):
                                    quantity=convert_quantity(p.get('quantity')),
                                    nutriments=p.get('nutriments'),
                                    nutri_score=p.get('nutrition_grade_fr'))
+
     return product_information
 
 
@@ -67,6 +75,10 @@ def convert_quantity(str_qty):
     Returns:
         dict_qty (dict)
     """
+
+    if str_qty is None:
+        return None
+    assert isinstance(str_qty, str)
     dict_qty = {'val': None, 'unit': None, 'std': False, 'approx': True}
 
     if type(str_qty) == float and math.isnan(str_qty):
@@ -101,7 +113,8 @@ def convert_quantity(str_qty):
             multiplier = int(m.group(1))
             value = float(m.group(2).replace(',','.')) * multiplier
             unit = rename_qty2stdunit(m.group(3))
-            dict_qty = convert_qty2gram({'val': value, 'unit': unit})
+            # dict_qty = convert_qty2gram({'val': value, 'unit': unit})
+            dict_qty = convert_to_gram(value, unit)
             lst_dict.append(dict_qty)
             continue
        
@@ -113,7 +126,8 @@ def convert_quantity(str_qty):
         if m is not None:
             value = float(m.group(1).replace(',','.'))
             unit = rename_qty2stdunit(m.group(2))
-            dict_qty = convert_qty2gram({'val': value, 'unit': unit})
+            # dict_qty = convert_qty2gram({'val': value, 'unit': unit})
+            dict_qty = convert_to_gram(value, unit)
             lst_dict.append(dict_qty)
             continue
 
@@ -174,6 +188,84 @@ def rename_qty2stdunit(unit):
     std_unit = [unit] if not std_unit else std_unit
     return std_unit[0]
 
+
+def convert_to_gram(value, unit):
+    """
+    Convert OFF quantity to a standard quantity (in grams)
+    Args:
+        value (float): quantity value
+        unit (str): quantity unit
+    Returns:
+        qty_dict (dict): a dictionary including the value, unit, success, and approximation information
+    """
+
+    res = dict(val=value, unit=unit, std=False, approx=True)
+    if isinstance(value, float) and isinstance(unit, str):
+        gr_multiplier = GRAM_CONVERSION_TABLE.get(unit)
+        if isinstance(gr_multiplier, float):
+            res = dict(val=value * gr_multiplier, unit='g', std=True, approx=(unit in ['g', 'kg', 'mg']))
+
+    return res
+
+
+def parse_qty_info(product_name):
+    """
+    Parse quantity information from the product name
+    Args:
+        product_name (str): name of the product to parse
+    Returns:
+        results (list): list of dictionaries containing both value and unit information
+    """
+
+    results = []
+    if isinstance(product_name, str):
+
+        str_groups = re.split(' |,|, ', product_name)
+        # Locate groups with digits
+        skip_next_group = False
+        for group_pos, str_group in enumerate(str_groups):
+
+            if skip_next_group:
+                skip_next_group = False
+                continue
+
+            if any(char.isdigit() for char in str_group):
+                # Check if unit available in the same group or the next
+                tmp_val, candidate_units = '', []
+                figure_stored, unit_found = False, False
+                for pos, char in enumerate(str_group):
+
+                    # Acquire all digits
+                    if char.isdigit() or (char == '.' and figure_stored):
+                        tmp_val += char
+                        figure_stored = True
+                    elif figure_stored:
+                        # Unit right next to it in the group
+                        if any(unit == str_group[pos: pos + len(unit)].lower() for unit in ALL_UNITS):
+                            unit_found = True
+                            candidate_units.extend([tmp_unit for tmp_unit in ALL_UNITS if tmp_unit == str_group[pos: pos + len(tmp_unit)].lower()])
+
+                else:
+                    # Unit in the beginning of next group
+                    if figure_stored and not unit_found:
+                        tmp_list = [tmp_unit for tmp_unit in ALL_UNITS if tmp_unit == str_groups[group_pos + 1][: len(tmp_unit)].lower()]
+                        if len(tmp_list) > 0:
+                            unit_found, skip_next_group = True, True
+                            candidate_units.extend(tmp_list)
+
+                # Check what we got
+                if unit_found:
+                    # Take longest matching unit
+                    unit = ''
+                    for tmp_unit in candidate_units:
+                        if len(tmp_unit) > len(unit):
+                            unit = tmp_unit
+                    results.append(dict(value=float(tmp_val), unit=unit))
+                    break
+
+    return results
+
+
 def convert_qty2gram(qty = {'val': '', 'unit': ''}):
     """
     Convert OFF quantity to a standard quantity (in grams)
@@ -216,6 +308,7 @@ def convert_qty2gram(qty = {'val': '', 'unit': ''}):
         approx = False
 
     return {'val': conv_val, 'unit': conv_unit, 'std': conv_std, 'approx': approx}
+
 
 def rename_group(str_group2=None):
     """
