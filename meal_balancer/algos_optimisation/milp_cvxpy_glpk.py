@@ -135,7 +135,7 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib_upper, cat_distrib_lower
     # construct an optimised n_meals * n_products matrix
     if solver == 'GLPK':
         solution_matrix = solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
-    else if solver == 'GUROBI':
+    elif solver == 'GUROBI':
         # NOT YET IMPLEMENTED
         solution_matrix = solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
 
