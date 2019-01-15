@@ -38,7 +38,11 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
     # TODO
     n_meals_min, n_meals_max = estimate_nmeals(listing_df, cat_distrib)
 
+    solution = None
+
     for n_meals in range(n_meals_min, n_meals_max+1, 1):
+
+        solution_previous = solution
 
         solution = optimize_baskets_for_nmeals(listing_df, cat_distrib_upper,
                                                cat_distrib_lower, n_meals,
@@ -47,12 +51,15 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
         if solution is None:
             # solver could not find an optimal solution
             # we have reached the max possible number of meals
+            print('cannot find solution for ',n_meals)
+            solution = solution_previous
             break
 
         # TODO deal with case where even n_meals_min doesn't give a viable solution
 
     # postprocess solution to get jsons for plotting
-    results_json = postprocess_optimised_solution_for_ui(solution.value, listing_df)
+    results_json = postprocess_optimised_solution_for_ui(solution, listing_df)
+    print(results_json)
 
     # get complete list of items in each basket, for output as csv
     #df_solution = postprocess_optimised_solution(solution)
@@ -87,7 +94,7 @@ def estimate_nmeals(listing_df, cat_distrib_lower):
     # Method 2: look at total number of items in each cat
     n_meals_max_2 = np.min(df_g['quantity'].values)
 
-    n_meals_max = min(n_meals_max_1, n_meals_max_2)
+    n_meals_max = int(min(n_meals_max_1, n_meals_max_2))
 
     # TODO how to set n_meals_min ?
     n_meals_min = 1
@@ -105,13 +112,14 @@ def load_meal_balancing_parameters(distrib_filename):
     delta_auth = 0.05
     meal_weight = 2000
 
-    df = pd.read_csv(distrib_filename)
+    df = pd.read_csv(distrib_filename, sep=';')
 
     # for level 1 categories, we have to remove duplicates first
     df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
 
-    cat_distrib = dict(zip(df['codeAlim_1'].values), df['idealDistrib_1'].values)
-    print(cat_distrib, 'yyy')
+    cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
+
+    assert np.isclose(1.0, sum(cat_distrib.values()))
 
     return cat_distrib, delta_auth, meal_weight
 
@@ -132,6 +140,8 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib_upper, cat_distrib_lower
         Otherwise returns None
     '''
 
+    # TODO this function isn't needed any more
+
     # construct an optimised n_meals * n_products matrix
     if solver == 'GLPK':
         solution_matrix = solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
@@ -139,13 +149,7 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib_upper, cat_distrib_lower
         # NOT YET IMPLEMENTED
         solution_matrix = solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
 
-    print(solution_matrix)
-    quit()
-
-    if solution:
-        return solution_matrix
-    else:
-        return None
+    return solution_matrix
 
 
 def postprocess_optimised_solution(solution, listing_df):
@@ -172,16 +176,19 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
     '''
 
     # how many items of each product have been allocated to baskets
-    allocated = np.sum(solution, axis=1)  # sum down columns (check)
+    print(solution)
+    allocated = np.sum(solution, axis=0)  # sum down columns (check)
+    print(allocated)
 
     # how many items of each product were there originally
-    total = listing_df.quantities.values
+    total = listing_df.quantity.values
 
     if len(total) != len(allocated):
         print('HERE')
         quit()
 
     remaining = total - allocated
+    print(remaining)
 
     listing_df['allocated'] = allocated
     listing_df['remaining'] = remaining
@@ -191,15 +198,17 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
 
     df_g = listing_df.groupby(['codeAlim_2', 'labelAlim_2'], as_index=False).agg({'allocated_weighted': 'sum', 'remaining_weighted': 'sum'})
 
-    df_g['allocated_weighted_frac'] = df['allocated_weighted'] / np.sum(df['allocated_weighted'].values)
-    df_g['remaining_weighted_frac'] = df['remaining_weighted'] / np.sum(df['remaining_weighted'].values)
+    df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / np.sum(df_g['allocated_weighted'].values)
+    df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / np.sum(df_g['remaining_weighted'].values)
 
     results = {
-            'allocated_items': zip(df_g['labelAlim_2'].values,
-                                   df_g['allocated_weighted_frac'].values),
-            'remaining_items': zip(df_g['labelAlim_2'].values,
-                                   df_g['remaining_weighted_frac'].values)}
+            'allocated_items': list(zip(df_g['labelAlim_2'].values,
+                                        df_g['allocated_weighted_frac'].values)),
+            'remaining_items': list(zip(df_g['labelAlim_2'].values,
+                                        df_g['remaining_weighted_frac'].values))}
 
+    print(results)
+    quit()
     return results
 
 
@@ -221,6 +230,12 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     pdt_domain = np.arange(0, n_products, step = 1)
     cat_domain = list(cat_distrib_upper.keys())
 
+    #print(categories)
+    #print(quantities)
+    #print(weights)
+    #print(cat_distrib_upper)
+    #print(cat_distrib_lower)
+
     #########################
     ## System specifiction ##
     #########################
@@ -231,13 +246,13 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     # Objective function: maximize the weight in the baskets
     # (note: cvx.multiply is element-wise multiplication)
     weights_matrix = np.tile(weights, (n_meals, 1))  # shape n_meals * n_products
-    print('weights_matrix', weights_matrix.shape)
+    #print(weights_matrix)
     objective = cvx.Maximize(cvx.sum(cvx.multiply(X, weights_matrix)))
 
     constraints = []
 
     # Constraint: each product can only be in one basket or no basket
-    #constraints.append(cvx.sum(X, axis = 1) <= quantities)
+    constraints.append(cvx.sum(X, axis = 0) <= quantities)
     constraints.append(X >= 0)
 
     # Constraint: limit difference between actual and ideal category distributions
@@ -270,9 +285,9 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
         print('No suitable solver exists among the installed solvers, or an unanticipated error has been encountered')
         error = True
 
-    print(X.value)
     if error:
         return None
 
-    return X
+    print('Put {:.0f} g in baskets out of {:.0f} g total'.format(prob.value, np.sum(weights * quantities)))
 
+    return X.value

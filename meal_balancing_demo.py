@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from utils.off_mgt import convert_quantity
 from sklearn.preprocessing import LabelEncoder
-from meal_balancer.algos_optimisation.milp_cvxpy_glpk import optimize_baskets
+from meal_balancer.algos_optimisation.milp_cvxpy_glpk import optimize_baskets, load_meal_balancing_parameters
 
 __author__ = 'Aoife Fogarty'
 __version__ = '0.1'
@@ -25,16 +25,18 @@ def main():
 
     # authorised difference between real and ideal distribution
     # TODO calibrate value
-    delta_auth = 0.05
+    delta_auth = 0.25
 
     # ideal total basket weight in grams
     # TODO replace with real value
     meal_size = 1400
 
     # filename = 'meal_balancing_parameters.json'
-    # cat_distrib, delta_auth, meal_size = load_meal_balancing_parameters(filename)
+    distrib_filename = 'data/food_categories.csv'
+    #cat_distrib, delta_auth, meal_size = load_meal_balancing_parameters(distrib_filename)
 
     df_listing = pd.read_csv(filename, sep=';', decimal=',')
+    df_listing = df_listing.head(15)
 
     # TODO (temporary fix until we have the weights function) add random weights
     n_products = len(df_listing)
@@ -42,7 +44,7 @@ def main():
     df_listing['weight_grams'] = np.random.random(size=n_products) * max_item_weight + 1.0
     df_listing['codeAlim_2'] = np.random.random_integers(low=1, high=n_categories, size=n_products) * 10
 
-    result = optimize_baskets(df_listing, cat_distrib, delta_auth, meal_size)
+    result = optimize_baskets(df_listing, cat_distrib, delta_auth, meal_size, solver='GLPK')
 
     print(result)
 
