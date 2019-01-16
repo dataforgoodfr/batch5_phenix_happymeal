@@ -232,6 +232,7 @@ def parse_qty_info(product_name):
             if any(char.isdigit() for char in str_group):
                 # Check if unit available in the same group or the next
                 tmp_val, candidate_units = '', []
+                multiplier = None
                 figure_stored, unit_found = False, False
                 for pos, char in enumerate(str_group):
 
@@ -244,10 +245,16 @@ def parse_qty_info(product_name):
                         if any(unit == str_group[pos: pos + len(unit)].lower() for unit in ALL_UNITS):
                             unit_found = True
                             candidate_units.extend([tmp_unit for tmp_unit in ALL_UNITS if tmp_unit == str_group[pos: pos + len(tmp_unit)].lower()])
+                        else:
+                            # Portion multiplier
+                            if char.lower() == 'x':
+                                multiplier = int(tmp_val)
+                            figure_stored = False
+                            tmp_val = ''
 
                 else:
                     # Unit in the beginning of next group
-                    if figure_stored and not unit_found:
+                    if figure_stored and not unit_found and group_pos + 1 < len(str_groups):
                         tmp_list = [tmp_unit for tmp_unit in ALL_UNITS if tmp_unit == str_groups[group_pos + 1][: len(tmp_unit)].lower()]
                         if len(tmp_list) > 0:
                             unit_found, skip_next_group = True, True
@@ -260,6 +267,8 @@ def parse_qty_info(product_name):
                     for tmp_unit in candidate_units:
                         if len(tmp_unit) > len(unit):
                             unit = tmp_unit
+                    if multiplier:
+                        tmp_val = multiplier * float(tmp_val)
                     results.append(dict(value=float(tmp_val), unit=unit))
                     break
 

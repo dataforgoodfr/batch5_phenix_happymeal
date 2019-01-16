@@ -21,7 +21,7 @@ from utils.off_mgt import get_product_information, convert_to_gram, parse_qty_in
 #args = parser.parse_args()
 
 
-listing_file          = 'commande_94349.csv'
+listing_file          = 'commande_81708.csv'  #  'commande_94349.csv'
 mapping_file          = 'data/mapping_off_ideal.csv'
 model_classifier_file = 'data/clf_nutrients_rf_groupeAlim_2_light.sav'
 model_matching_file   = 'data/clf_names_nb_light.sav'
@@ -60,6 +60,11 @@ def main():
     # Read food listing file
     input_listing = li.importListing(listing_file)
 
+    # import pdb; pdb.set_trace()
+    input_listing['phenix_grams'] = input_listing.Produit_Nom.apply(lambda s, f=parse_phenix_grams: f(s))
+    input_listing['off_grams'] = input_listing.EAN.apply(lambda s, f=get_off_grams: f(s))
+    input_listing['weights_grams'] = input_listing.phenix_grams
+
     # Add food category to the data frame
     input_listing = ct.get_foodGroupFromToDF(input_listing,
                                              EAN_col='EAN',
@@ -70,8 +75,8 @@ def main():
     print("category added")
     print(input_listing)
     print(input_listing.columns)
-    input_listing['phenix_grams'] = input_listing.Produit_Nom.apply(lambda s, f=parse_phenix_grams: f(s))
-    input_listing['off_grams'] = input_listing.EAN.apply(lambda s, f=get_off_grams: f(s))
+    # input_listing['phenix_grams'] = input_listing.Produit_Nom.apply(lambda s, f=parse_phenix_grams: f(s))
+    # input_listing['off_grams'] = input_listing.EAN.apply(lambda s, f=get_off_grams: f(s))
 
     # write output file
     input_listing.to_csv("data/output/" + listing_file,
