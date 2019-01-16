@@ -118,12 +118,12 @@ def get_foodGroup(EAN,
 
 
 
-def get_foodGroupFromToDF(listing_df, 
+def get_foodGroupFromToDF(listing_df,
                           EAN_col,
                           product_name_col,
                           mapping_file,
                           model_classifier_file,
-                          model_matching_file): 
+                          model_matching_file):
 
     '''
     -- Input --

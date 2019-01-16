@@ -14,68 +14,17 @@ __maintainer__ = 'Aoife Fogarty'
 __status__ = 'Development'
 
 
-def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight):
+def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
     '''
     Args:
         listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
         cat_distrib (dict): ideal distribution, keys=categories
         delta_auth (float): max authorised difference between ideal and actual category distributions
         meal_weight (float): ideal weight in grams of one basket
+        solver (str): GLPK or GUROBI
     Return:
         df with details of products in each basket after optimized distribution, df has column 'allocated_basket' with value of 0 if item was not distributed
         json with details of distributed and undistributed products, for plotting in UI
-    '''
-
-    # initial estimation of min and max number of meals we can make
-    # TODO
-    n_meals_min = 1
-    n_meals_max = 20
-
-    for n_meals in range(n_meals_min, n_meals_max+1, 1):
-
-        solution = optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, meal_weight)
-
-        if solution is None:
-            # solver could not find an optimal solution
-            # we have reached the max possible number of meals
-            break
-
-        # TODO deal with case where even n_meals_min doesn't give a viable solution
-
-    # postprocess solution to get jsons for plotting
-    df_solution = postprocess_optimised_solution(solution)
-    results_json = {}
-    # results_json = postprocess_optimised_solution_df(solution_df)
-
-    return df_solution, results_json
-
-
-def load_meal_balancing_parameters(filename):
-    '''
-    Args:
-        filename (str): containing preset parameters
-    '''
-
-    # TODO
-
-    return cat_distrib, delta_auth, meal_weight
-
-
-def optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, meal_weight):
-    '''
-    For a given number of meals (n_meals), get the distribution of products
-    into baskets/meals that best corresponds to a given distribution of
-    categories in each basket
-
-    Args:
-        listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
-        cat_distrib (dict): ideal distribution XXX
-        delta_auth (float): max authorised difference between ideal and actual category distributions
-        meal_weight (float): ideal weight in grams of one basket
-        n_meals (int): number of baskets to construct
-    Returns:
-        solution matrix if a solution could be found for this value of n_meals
-        Otherwise returns None
     '''
 
     # use the delta parameter to set allowed upper and lower
@@ -85,20 +34,125 @@ def optimize_baskets_for_nmeals(listing_df, cat_distrib, n_meals, delta_auth, me
     cat_distrib_lower = {k: (v - delta_auth) * meal_weight
                          for (k,v) in cat_distrib.items()}
 
+    # initial estimation of min and max number of meals we can make
+    # TODO
+    n_meals_min, n_meals_max = estimate_nmeals(listing_df, cat_distrib)
+
+    solution = None
+
+    for n_meals in range(n_meals_min, n_meals_max+1, 1):
+
+        solution_previous = solution
+
+        solution = optimize_baskets_for_nmeals(listing_df, cat_distrib_upper,
+                                               cat_distrib_lower, n_meals,
+                                               solver)
+
+        if solution is None:
+            # solver could not find an optimal solution
+            # we have reached the max possible number of meals
+            print('cannot find solution for ',n_meals)
+            solution = solution_previous
+            break
+
+        # TODO deal with case where even n_meals_min doesn't give a viable solution
+
+    # postprocess solution to get jsons for plotting
+    results_json = postprocess_optimised_solution_for_ui(solution, listing_df)
+    print(results_json)
+
+    # get complete list of items in each basket, for output as csv
+    #df_solution = postprocess_optimised_solution(solution)
+    df_solution = None  # TODO
+
+    return df_solution, results_json
+
+
+def estimate_nmeals(listing_df, cat_distrib_lower):
+    '''
+    Estimate the number of balanced meals that can be made
+    from a given listing
+    '''
+    # # if a category is missing from the dataframe
+    # # the number of possible meals is 0
+    # cat_in_listing = listing_df[''].unique()
+    # for cat in cat_distrib.keys():
+    #     if cat not in cat_in_listing:
+    #         print('Cannot fnd malanced meals because category {} is missing from listing'.format(cat))
+    #         return 0, 0
+
+    # Use two different methods to estimate the maximum number of possible meals
+    df_g = listing_df.groupby('codeAlim_2', as_index=False).agg({'weight_grams': 'sum', 'quantity': 'sum'})
+    categories = df_g['codeAlim_2'].values
+
+    # Method 1: total weight in each category in the listing / minimum
+    # weight that should be in each basket in that category
+    sum_weights = df_g['weight_grams'].values
+    cat_weights = np.asarray([cat_distrib_lower[c] for c in categories])
+    n_meals_max_1 = np.min(np.floor(sum_weights / cat_weights))
+
+    # Method 2: look at total number of items in each cat
+    n_meals_max_2 = np.min(df_g['quantity'].values)
+
+    n_meals_max = int(min(n_meals_max_1, n_meals_max_2))
+
+    # TODO how to set n_meals_min ?
+    n_meals_min = 1
+
+    return n_meals_min, n_meals_max
+
+
+def load_meal_balancing_parameters(distrib_filename):
+    '''
+    Args:
+        distrib_filename (str): containing ideal distribution
+    '''
+
+    # TODO load all parameters from file
+    delta_auth = 0.05
+    meal_weight = 2000
+
+    df = pd.read_csv(distrib_filename, sep=';')
+
+    # for level 1 categories, we have to remove duplicates first
+    df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+
+    cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
+
+    assert np.isclose(1.0, sum(cat_distrib.values()))
+
+    return cat_distrib, delta_auth, meal_weight
+
+
+def optimize_baskets_for_nmeals(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals, solver):
+    '''
+    For a given number of meals (n_meals), get the distribution of products
+    into baskets/meals that best corresponds to a given distribution of
+    categories in each basket
+
+    Args:
+        listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
+        cat_distrib_upper, cat_distrib_lower (dict): ideal distribution
+        n_meals (int): number of baskets to construct
+        solver (str): GLPK or GUROBI
+    Returns:
+        solution matrix if a solution could be found for this value of n_meals
+        Otherwise returns None
+    '''
+
+    # TODO this function isn't needed any more
+
     # construct an optimised n_meals * n_products matrix
-    solution_matrix = solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
-    #solution_matrix = solver_gurobi()
+    if solver == 'GLPK':
+        solution_matrix = solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
+    elif solver == 'GUROBI':
+        # NOT YET IMPLEMENTED
+        solution_matrix = solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
 
-    print(solution_matrix)
-    quit()
-
-    if solution:
-        return solution_matrix
-    else:
-        return None
+    return solution_matrix
 
 
-def postprocess_optimised_solution(solution):
+def postprocess_optimised_solution(solution, listing_df):
     '''
     Process solution matrix (output of MILP solver)
     to get dataframe with allocation of items to baskets
@@ -115,12 +169,58 @@ def postprocess_optimised_solution(solution):
     pass
 
 
-def postprocess_optimised_solution_df(solution_df):
+def postprocess_optimised_solution_for_ui(solution, listing_df):
     '''
-    Process solution dataframe (with allocation of items to baskets)
+    Process solution matrix (output of MILP solver)
     to get json for plotting in UI
     '''
-    pass
+
+    # how many items of each product have been allocated to baskets
+    allocated = np.sum(solution, axis=0)  # sum down columns (check)
+    n_balanced_meals = solution.shape[0]
+    print(allocated)
+
+    # how many items of each product were there originally
+    total = listing_df.quantity.values
+
+    assert len(total) == len(allocated)
+
+    remaining = total - allocated
+    n_remaining_items = np.sum(remaining)
+    print(remaining)
+
+    listing_df['allocated'] = allocated
+    listing_df['remaining'] = remaining
+
+    listing_df['allocated_weighted'] = allocated * listing_df['weight_grams']
+    listing_df['remaining_weighted'] = remaining * listing_df['weight_grams']
+
+    df_g = listing_df.groupby(['codeAlim_2', 'labelAlim_2'], 
+                              as_index=False).agg({'allocated_weighted': 'sum', 
+                                                   'remaining_weighted': 'sum'})
+
+    total_weight_allocated_items = np.sum(df_g['allocated_weighted'].values)
+    total_weight_remaining_items = np.sum(df_g['remaining_weighted'].values)
+    total_weight = total_weight_allocated_items + total_weight_remaining_items
+
+    if total_weight_allocated_items > 0:
+        df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / total_weight_allocated_items
+    if total_weight_remaining_items > 0:
+        df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / total_weight_remaining_items
+
+    results = {
+            'allocated_items': list(zip(df_g['labelAlim_2'].values,
+                                        df_g['allocated_weighted_frac'].values)),
+            'remaining_items': list(zip(df_g['labelAlim_2'].values,
+                                        df_g['remaining_weighted_frac'].values)),
+            'nb_balanced_meals': n_balanced_meals,
+            'nb_remaining_items': n_remaining_items,
+            'pct_weight_allocated_items': total_weight_allocated_items / total_weight,
+            'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
+
+    print(results)
+    quit()
+    return results
 
 
 def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
@@ -141,6 +241,12 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     pdt_domain = np.arange(0, n_products, step = 1)
     cat_domain = list(cat_distrib_upper.keys())
 
+    #print(categories)
+    #print(quantities)
+    #print(weights)
+    #print(cat_distrib_upper)
+    #print(cat_distrib_lower)
+
     #########################
     ## System specifiction ##
     #########################
@@ -151,12 +257,13 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     # Objective function: maximize the weight in the baskets
     # (note: cvx.multiply is element-wise multiplication)
     weights_matrix = np.tile(weights, (n_meals, 1))  # shape n_meals * n_products
+    #print(weights_matrix)
     objective = cvx.Maximize(cvx.sum(cvx.multiply(X, weights_matrix)))
 
     constraints = []
 
     # Constraint: each product can only be in one basket or no basket
-    #constraints.append(cvx.sum(X, axis = 1) <= quantities)
+    constraints.append(cvx.sum(X, axis = 0) <= quantities)
     constraints.append(X >= 0)
 
     # Constraint: limit difference between actual and ideal category distributions
@@ -181,7 +288,7 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     parameters = {'tm_lim' : 10}
     error = False
     try:
-        solution = prob.solve(solver='GLPK_MI',verbose = True, solver_specific_opts=parameters)
+        solution_status = prob.solve(solver='GLPK_MI',verbose = True, solver_specific_opts=parameters)
     except DCPError:
         print('Problem is not Disciplined Convex Programming compliant')
         error = True
@@ -189,8 +296,9 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
         print('No suitable solver exists among the installed solvers, or an unanticipated error has been encountered')
         error = True
 
-    print(X.value)
     if error:
         return None
 
-    return X
+    print('Put {:.0f} g in baskets out of {:.0f} g total'.format(prob.value, np.sum(weights * quantities)))
+
+    return X.value
