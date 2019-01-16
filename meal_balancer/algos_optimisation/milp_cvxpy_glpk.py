@@ -176,18 +176,17 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
     '''
 
     # how many items of each product have been allocated to baskets
-    print(solution)
     allocated = np.sum(solution, axis=0)  # sum down columns (check)
+    n_balanced_meals = solution.shape[0]
     print(allocated)
 
     # how many items of each product were there originally
     total = listing_df.quantity.values
 
-    if len(total) != len(allocated):
-        print('HERE')
-        quit()
+    assert len(total) == len(allocated)
 
     remaining = total - allocated
+    n_remaining_items = np.sum(remaining)
     print(remaining)
 
     listing_df['allocated'] = allocated
@@ -196,16 +195,28 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
     listing_df['allocated_weighted'] = allocated * listing_df['weight_grams']
     listing_df['remaining_weighted'] = remaining * listing_df['weight_grams']
 
-    df_g = listing_df.groupby(['codeAlim_2', 'labelAlim_2'], as_index=False).agg({'allocated_weighted': 'sum', 'remaining_weighted': 'sum'})
+    df_g = listing_df.groupby(['codeAlim_2', 'labelAlim_2'], 
+                              as_index=False).agg({'allocated_weighted': 'sum', 
+                                                   'remaining_weighted': 'sum'})
 
-    df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / np.sum(df_g['allocated_weighted'].values)
-    df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / np.sum(df_g['remaining_weighted'].values)
+    total_weight_allocated_items = np.sum(df_g['allocated_weighted'].values)
+    total_weight_remaining_items = np.sum(df_g['remaining_weighted'].values)
+    total_weight = total_weight_allocated_items + total_weight_remaining_items
+
+    if total_weight_allocated_items > 0:
+        df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / total_weight_allocated_items
+    if total_weight_remaining_items > 0:
+        df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / total_weight_remaining_items
 
     results = {
             'allocated_items': list(zip(df_g['labelAlim_2'].values,
                                         df_g['allocated_weighted_frac'].values)),
             'remaining_items': list(zip(df_g['labelAlim_2'].values,
-                                        df_g['remaining_weighted_frac'].values))}
+                                        df_g['remaining_weighted_frac'].values)),
+            'nb_balanced_meals': n_balanced_meals,
+            'nb_remaining_items': n_remaining_items,
+            'pct_weight_allocated_items': total_weight_allocated_items / total_weight,
+            'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
 
     print(results)
     quit()
