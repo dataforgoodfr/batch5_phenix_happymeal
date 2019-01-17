@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import sys
 sys.path.insert(0,'../..')
+from meal_balancer.grouping import create_batches
 
 # optimisation algorithm for balanced meal creation
 # cvxpy + glpk implementation of Julie Seguela's gurobi implementation
@@ -17,9 +18,11 @@ __status__ = 'Development'
 def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
     '''
     Args:
-        listing_df (pandas df): contains weight, quantity and category of products to distribute into baskets
+        listing_df (pandas df): contains weight, quantity and
+                   category of products to distribute into baskets
         cat_distrib (dict): ideal distribution, keys=categories
-        delta_auth (float): max authorised difference between ideal and actual category distributions
+        delta_auth (float): max authorised difference between ideal
+                            and actual category distributions
         meal_weight (float): ideal weight in grams of one basket
         solver (str): GLPK or GUROBI
     Return:
@@ -35,8 +38,8 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
                          for (k,v) in cat_distrib.items()}
 
     # initial estimation of min and max number of meals we can make
-    # TODO
-    n_meals_min, n_meals_max = estimate_nmeals(listing_df, cat_distrib_lower)
+    n_meals_max = estimate_nmeals_max(listing_df, cat_distrib_lower)
+    n_meals_min = estimate_nmeals_min(listing_df, cat_distrib, meal_weight)
     print('Trying to find between {} and {} meals'.format(n_meals_min, n_meals_max))
 
     # initialise solution matrix
@@ -58,8 +61,6 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
             solution = solution_previous
             break
 
-        # TODO deal with case where even n_meals_min doesn't give a viable solution
-
     # postprocess solution to get jsons for plotting
     results_json = postprocess_optimised_solution_for_ui(solution, listing_df)
     print(results_json)
@@ -71,10 +72,48 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
     return df_solution, results_json
 
 
-def estimate_nmeals(listing_df, cat_distrib_lower):
+def estimate_nmeals_min(listing_df, cat_distrib, meal_weight):
     '''
-    Estimate the number of balanced meals that can be made
-    from a given listing
+    Estimate the min number of balanced meals that can be made
+    from a given listing, based on the 'naive distribution' algorithm
+
+    Args:
+        listing_df (pandas df): contains weight, quantity and
+                   category of products to distribute into baskets
+        cat_distrib (dict): ideal distribution, keys=categories
+        meal_weight (float): ideal weight in grams of one basket
+    '''
+    # create new df with one line per item instead of one line per product
+    df_new = pd.DataFrame([listing_df.ix[idx]
+                           for idx in listing_df.index
+                           for _ in range(int(listing_df.ix[idx]['quantity']))])
+
+    # put items in format needed by create_batches
+    df_new = df_new.reset_index(drop=True)\
+                   .rename(columns={'codeAlim_1': 'category',
+                                    'weight_grams': 'quantity'})
+    items = df_new[['category', 'quantity']].to_dict(orient='records')
+
+    assert np.isclose(len(items), listing_df.quantity.sum(), rtol=0.05)
+
+    all_batches, storage, big_items, unidentified, tmp_items, loss = create_batches(items=items,
+            balanced_split=cat_distrib,
+            batch_qty=meal_weight,
+            overflow_thresh=0.05,
+            underflow_thresh=0.05)
+
+    # TODO we could also use other info from this function
+    # to initialise the MILP algo in the following step
+
+    n_meals_min = len(all_batches)
+    return n_meals_min
+
+
+def estimate_nmeals_max(listing_df, cat_distrib_lower):
+    '''
+    Estimate the max number of balanced meals that can be made
+    from a given listing, based on the number of items and
+    total weight in each category
     '''
     # # if a category is missing from the dataframe
     # # the number of possible meals is 0
@@ -108,10 +147,7 @@ def estimate_nmeals(listing_df, cat_distrib_lower):
 
     n_meals_max = int(min(n_meals_max_1, n_meals_max_2))
 
-    # TODO how to set n_meals_min ?
-    n_meals_min = 1
-
-    return n_meals_min, n_meals_max
+    return n_meals_max
 
 
 def load_meal_balancing_parameters(distrib_filename):
@@ -149,7 +185,7 @@ def load_category_mappings(distrib_filename):
     map_code1_label1 = dict(zip(df['codeAlim_1'].values,
                                 df['labelAlim_1'].values))
 
-    return map_label2_code1, map_code1_label1 
+    return map_label2_code1, map_code1_label1
 
 
 def optimize_baskets_for_nmeals(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals, solver):
@@ -212,19 +248,21 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
     to get json for plotting in UI
     '''
 
-    # how many items of each product have been allocated to baskets
-    allocated = np.sum(solution, axis=0)  # sum down columns (check)
-    n_balanced_meals = solution.shape[0]
-    print(allocated)
-
     # how many items of each product were there originally
     total = listing_df.quantity.values
+
+    # how many items of each product have been allocated to baskets
+    if solution is None:
+        n_balanced_meals = 0
+        allocated = np.zeros(len(total), dtype=np.float64)
+    else:
+        allocated = np.sum(solution, axis=0)  # sum down columns (check)
+        n_balanced_meals = solution.shape[0]
 
     assert len(total) == len(allocated)
 
     remaining = total - allocated
     n_remaining_items = np.sum(remaining)
-    print(remaining)
 
     listing_df['allocated'] = allocated
     listing_df['remaining'] = remaining
@@ -232,8 +270,8 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
     listing_df['allocated_weighted'] = allocated * listing_df['weight_grams']
     listing_df['remaining_weighted'] = remaining * listing_df['weight_grams']
 
-    df_g = listing_df.groupby(['codeAlim_1', 'labelAlim_1'], 
-                              as_index=False).agg({'allocated_weighted': 'sum', 
+    df_g = listing_df.groupby(['codeAlim_1', 'labelAlim_1'],
+                              as_index=False).agg({'allocated_weighted': 'sum',
                                                    'remaining_weighted': 'sum'})
 
     total_weight_allocated_items = np.sum(df_g['allocated_weighted'].values)
