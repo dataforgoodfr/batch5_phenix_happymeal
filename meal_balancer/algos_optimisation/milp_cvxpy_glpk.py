@@ -4,6 +4,7 @@ import pandas as pd
 import sys
 sys.path.insert(0,'../..')
 from meal_balancer.grouping import create_batches
+# from gurobipy import *
 
 # optimisation algorithm for balanced meal creation
 # cvxpy + glpk implementation of Julie Seguela's gurobi implementation
@@ -32,11 +33,12 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
 
     # use the delta parameter to set allowed upper and lower
     # limits to the category distribution of each basket
-    cat_distrib_upper = {k: (v + delta_auth) * meal_weight
+    cat_distrib_upper = {k: (v * (1 + delta_auth) * meal_weight)
                          for (k,v) in cat_distrib.items()}
-    cat_distrib_lower = {k: (v - delta_auth) * meal_weight
+    cat_distrib_lower = {k: (v * (1 - delta_auth) * meal_weight)
                          for (k,v) in cat_distrib.items()}
-
+    cat_distrib       = {k: v for k, v in cat_distrib.items() if v > 0}
+    
     # initial estimation of min and max number of meals we can make
     n_meals_max = estimate_nmeals_max(listing_df, cat_distrib_lower)
     n_meals_min = estimate_nmeals_min(listing_df, cat_distrib, meal_weight)
@@ -150,23 +152,26 @@ def estimate_nmeals_max(listing_df, cat_distrib_lower):
     return n_meals_max
 
 
-def load_meal_balancing_parameters(distrib_filename):
+def load_meal_balancing_parameters(distrib_filename, listing_df):
     '''
     Args:
         distrib_filename (str): containing ideal distribution and food categories
     '''
 
     # TODO load all parameters from file
-    delta_auth = 0.05
-    meal_weight = 1000
+    delta_auth = 0.3
+    meal_weight = 5000
 
     df = pd.read_csv(distrib_filename, sep=';')
+    
+    # eligible categories (found in listing)
+    cat_ok = list(set(listing_df['codeAlim_1']))
 
     # for level 1 categories, we have to remove duplicates first
-    df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
-
+    
     assert np.isclose(1.0, sum(cat_distrib.values()))
 
     return cat_distrib, delta_auth, meal_weight
@@ -377,3 +382,90 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
     print('Put {:.0f} g in baskets out of {:.0f} g total'.format(prob.value, np.sum(weights * quantities)))
 
     return X.value
+
+def solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
+    '''
+    Returns:
+        integer matrix of dimensions n_meals * n_products
+        Each matrix element is the number of items of a product in a basket
+    '''
+    
+    # Fixed args
+    time_limit = 600
+    display_interval = 30
+        
+    print('Trying to find solution for {} meals'.format(n_meals))
+
+    # Model creation, decision variable Xi,j, meal i associated with product j?
+    hm = Model("HM")
+   
+    pdt_info_dict = listing_df.to_dict()
+    
+    n_products = len(listing_df)
+    weights = listing_df['weight_grams'].values
+    categories = listing_df['codeAlim_1'].values
+    quantities = listing_df['quantity'].values
+
+    meal_domain = np.arange(0, n_meals, step = 1)
+    pdt_domain = listing_df.index.tolist()
+    cat_domain = list(cat_distrib_upper.keys())
+
+    #print(categories)
+    #print(quantities)
+    #print(weights)
+    #print(cat_distrib_upper)
+    #print(cat_distrib_lower)
+
+    #########################
+    ## System specifiction ##
+    #########################
+
+    # matrix of integers to solve for
+    X = hm.addVars(meal_domain, pdt_domain, vtype=GRB.INTEGER, name='x')
+
+    # Objective function: maximize the weight in the baskets
+    hm.setObjective(quicksum(X.sum('*', pdt) \
+                    for pdt in pdt_domain), \
+                    sense = GRB.MAXIMIZE)
+
+    # Constraint: can't use more than available for each product
+    hm.addConstrs((X.sum('*', pdt) <= pdt_info_dict['quantity'][pdt]\
+                  for pdt in pdt_domain))
+
+    # Constraint: can't oversize or undersize a category too much
+    hm.addConstrs(quicksum((X[meal, pdt] * pdt_info_dict['weight_grams'][pdt]) \
+                           for pdt in pdt_domain if pdt_info_dict['codeAlim_1'][pdt] == cat) \
+                  <= cat_distrib_upper[cat]\
+                  for cat in cat_domain \
+                  for meal in meal_domain)
+    
+    hm.addConstrs(quicksum((X[meal, pdt] * pdt_info_dict['weight_grams'][pdt]) \
+                           for pdt in pdt_domain if pdt_info_dict['codeAlim_1'][pdt] == cat) \
+                  >= cat_distrib_lower[cat]
+                  for cat in cat_domain \
+                  for meal in meal_domain)
+    
+    hm.Params.TimeLimit       = time_limit
+    hm.Params.Threads         = 0
+    hm.Params.DisplayInterval = display_interval
+    
+    hm.optimize()
+    
+    status = hm.status
+
+    res_df = pd.DataFrame(columns = ('meal', 'pdt', 'qty'))
+    
+    for meal in meal_domain:
+        for pdt in pdt_domain:
+            if X[meal, pdt].getAttr('x') >= 1:
+                res_df = res_df.append({
+                        'meal': meal,
+                        'pdt': pdt,
+                        'qty': X[meal, pdt].getAttr('x')
+                        }, ignore_index = True)
+                
+    # Adding product name and category
+    res_df = res_df.merge(listing_df.reset_index(), left_on = 'pdt', right_on = 'index')
+    print(res_df.loc[res_df['qty'] > 0, 'weight_grams'].sum())
+
+    return res_df

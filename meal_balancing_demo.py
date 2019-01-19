@@ -28,12 +28,9 @@ def main():
     # meal_size = 1000
 
     distrib_filename = 'data/food_categories.csv'
-    cat_distrib, delta_auth, meal_size = load_meal_balancing_parameters(distrib_filename)
-    print('delta_auth', delta_auth)
-    print('meal_size', meal_size)
-
+    
     map_label2_code1, map_code1_label1 = load_category_mappings(distrib_filename)
-
+    
     df_listing = pd.read_csv(filename, sep=';', decimal=',')
 
     # TODO chose between phenix and off grams
@@ -47,6 +44,10 @@ def main():
     # TODO treat these better
     df_listing = df_listing[~df_listing.codeAlim_1.isin([0,70])]
     df_listing = df_listing[~pd.isnull(df_listing['weight_grams'])]
+    
+    cat_distrib, delta_auth, meal_size = load_meal_balancing_parameters(distrib_filename, df_listing)
+    print('delta_auth', delta_auth)
+    print('meal_size', meal_size)
 
     result = optimize_baskets(df_listing, cat_distrib, delta_auth, meal_size, solver='GLPK')
 
