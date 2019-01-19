@@ -60,10 +60,14 @@ def main():
     # Read food listing file
     input_listing = li.importListing(listing_file)
 
+
+    # Extract quantity in grams
     # import pdb; pdb.set_trace()
     input_listing['phenix_grams'] = input_listing.Produit_Nom.apply(lambda s, f=parse_phenix_grams: f(s))
     input_listing['off_grams'] = input_listing.EAN.apply(lambda s, f=get_off_grams: f(s))
     input_listing['weight_grams'] = input_listing.phenix_grams
+    
+    print("weight added")
 
     # Add food category to the data frame
     input_listing = ct.get_foodGroupFromToDF(input_listing,
@@ -75,14 +79,12 @@ def main():
     print("category added")
     print(input_listing)
     print(input_listing.columns)
-    # input_listing['phenix_grams'] = input_listing.Produit_Nom.apply(lambda s, f=parse_phenix_grams: f(s))
-    # input_listing['off_grams'] = input_listing.EAN.apply(lambda s, f=get_off_grams: f(s))
 
     # write output file
     input_listing.to_csv("data/output/" + listing_file,
                          sep=';', encoding='UTF-8', index=False)
 
-    # Ready now to extract quantity in grams
+    # Ready now to apply meal balancer
 
 
 if __name__ == '__main__':
