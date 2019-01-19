@@ -1,7 +1,7 @@
 codeAlim_1;codeAlim_2;labelAlim_1;labelAlim_2;weigth_grams;idealDistrib_1;idealDistrib_2
 0;0;Exclus;Exclus;0;0;
-10;11;Viande, poisson, œufs;Viande, oeufs;200;0.12;
-10;12;Viande, poisson, œufs;Poisson;200;0.12;0.25
+10;11;Viande, poisson, oeufs;Viande, oeufs;200;0.12;
+10;12;Viande, poisson, oeufs;Poisson;200;0.12;0.25
 20;20;Produits gras sucrés salés;Produits gras sucrés salés;200;0.025;
 30;30;Matières grasses ajoutées;Matières grasses ajoutées;200;0.025;
 40;41;Produits laitiers;Produits laitiers (hors fromage);500;0.25;
