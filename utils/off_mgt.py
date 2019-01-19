@@ -269,6 +269,8 @@ def parse_qty_info(product_name):
                             unit = tmp_unit
                     if multiplier:
                         tmp_val = multiplier * float(tmp_val)
+                    if tmp_val == '':
+                        tmp_val = 'NaN'
                     results.append(dict(value=float(tmp_val), unit=unit))
                     break
 
