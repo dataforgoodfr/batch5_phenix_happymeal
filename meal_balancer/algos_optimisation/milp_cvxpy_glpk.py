@@ -169,9 +169,10 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
 
     # for level 1 categories, we have to remove duplicates first
     df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    #df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
-    
+   
     assert np.isclose(1.0, sum(cat_distrib.values()))
 
     return cat_distrib, delta_auth, meal_weight
@@ -285,8 +286,12 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
 
     if total_weight_allocated_items > 0:
         df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / total_weight_allocated_items
+    else: 
+        df_g['allocated_weighted_frac'] = 0.0
     if total_weight_remaining_items > 0:
         df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / total_weight_remaining_items
+    else:
+        df_g['remaining_weighted_frac'] = 0.0
 
     results = {
             'allocated_items': list(zip(df_g['labelAlim_1'].values,
@@ -299,7 +304,6 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
             'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
 
     print(results)
-    quit()
     return results
 
 
