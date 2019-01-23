@@ -1,4 +1,5 @@
 import cvxpy as cvx
+import json
 import numpy as np
 import pandas as pd
 import sys
@@ -16,7 +17,7 @@ __maintainer__ = 'Aoife Fogarty'
 __status__ = 'Development'
 
 
-def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
+def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, results_filename, solver):
     '''
     Args:
         listing_df (pandas df): contains weight, quantity and
@@ -64,7 +65,7 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, solver):
             break
 
     # postprocess solution to get jsons for plotting
-    results_json = postprocess_optimised_solution_for_ui(solution, listing_df)
+    results_json = postprocess_optimised_solution_for_ui(solution, listing_df, results_filename)
     print(results_json)
 
     # get complete list of items in each basket, for output as csv
@@ -168,8 +169,8 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
     cat_ok = list(set(listing_df['codeAlim_1']))
 
     # for level 1 categories, we have to remove duplicates first
-    df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
-    #df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    #df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
    
@@ -248,7 +249,7 @@ def postprocess_optimised_solution(solution, listing_df):
     pass
 
 
-def postprocess_optimised_solution_for_ui(solution, listing_df):
+def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename):
     '''
     Process solution matrix (output of MILP solver)
     to get json for plotting in UI
@@ -303,7 +304,9 @@ def postprocess_optimised_solution_for_ui(solution, listing_df):
             'pct_weight_allocated_items': total_weight_allocated_items / total_weight,
             'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
 
-    print(results)
+    with open(results_filename, 'w') as f:
+        json.dump(results, f)
+
     return results
 
 

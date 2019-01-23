@@ -13,7 +13,7 @@ __status__ = 'Development'
 def main():
 
     # output of listing_categorization_demo.py
-    filename = 'data/output/commande_94349.csv'
+    filename = 'data/output/61129.csv'
 
     # # ideal distribution of products in each category 10, 20, etc.
     # # categories are listed in data/food_categories.csv
@@ -49,7 +49,8 @@ def main():
     print('delta_auth', delta_auth)
     print('meal_size', meal_size)
 
-    result = optimize_baskets(df_listing, cat_distrib, delta_auth, meal_size, solver='GLPK')
+    results_filename = 'data/output/results_61129.json'
+    result = optimize_baskets(df_listing, cat_distrib, delta_auth, meal_size, results_filename, solver='GLPK')
 
     print(result)
 
