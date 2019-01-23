@@ -245,6 +245,7 @@ def parse_qty_info(product_name):
                         if any(unit == str_group[pos: pos + len(unit)].lower() for unit in ALL_UNITS):
                             unit_found = True
                             candidate_units.extend([tmp_unit for tmp_unit in ALL_UNITS if tmp_unit == str_group[pos: pos + len(tmp_unit)].lower()])
+                            break
                         else:
                             # Portion multiplier
                             if char.lower() == 'x':
