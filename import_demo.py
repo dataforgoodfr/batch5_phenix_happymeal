@@ -60,13 +60,13 @@ def main():
     # Read food listing file
     input_listing = li.importListing(listing_file)
 
-
     # Extract quantity in grams
     # import pdb; pdb.set_trace()
+    input_listing.drop(columns='#', inplace=True)
     input_listing['phenix_grams'] = input_listing.Produit_Nom.apply(lambda s, f=parse_phenix_grams: f(s))
     input_listing['off_grams'] = input_listing.EAN.apply(lambda s, f=get_off_grams: f(s))
     input_listing['weight_grams'] = input_listing.phenix_grams
-    
+
     print("weight added")
 
     # Add food category to the data frame
@@ -79,6 +79,13 @@ def main():
     print("category added")
     print(input_listing)
     print(input_listing.columns)
+
+    input_listing.columns = ['product_name', 'ean', 'unit_price', 'quantity', 'total_price', 'phenix_grams', 'off_grams', 'weight_grams', 'group_name', 'group_method']
+    input_listing = input_listing[pd.notnull(input_listing.product_name)]
+    int_cols = ['ean', 'group_method']
+    input_listing[int_cols] = input_listing[int_cols].astype(int)
+    float_cols = ['unit_price', 'quantity', 'total_price']
+    input_listing[float_cols] = input_listing[float_cols].astype(float)
 
     # write output file
     input_listing.to_csv("data/output/" + listing_file,
