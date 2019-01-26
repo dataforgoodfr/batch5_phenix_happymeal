@@ -75,7 +75,8 @@ def main():
                                              product_name_col='Produit_Nom',
                                              mapping_file=mapping_file,
                                              model_classifier_file=model_classifier_file,
-                                             model_matching_file=model_matching_file)
+                                             model_matching_file=model_matching_file,
+                                             group_name = 'labelAlim_1')
     print("category added")
     print(input_listing)
     print(input_listing.columns)

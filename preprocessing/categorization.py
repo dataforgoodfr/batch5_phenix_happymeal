@@ -2,7 +2,7 @@
 """
 Functions used to find happymeal product categories:
  - Exclus
- - Viande, œufs
+ - Viande, oeufs
  - Poisson
  - Produits gras sucrés salés
  - Matières grasses ajoutées
@@ -123,7 +123,8 @@ def get_foodGroupFromToDF(listing_df,
                           product_name_col,
                           mapping_file,
                           model_classifier_file,
-                          model_matching_file):
+                          model_matching_file,
+                          group_name):
 
     '''
     -- Input --
@@ -134,11 +135,12 @@ def get_foodGroupFromToDF(listing_df,
     mapping_file : path of file which enables to map OpenFoodFacts' groups to our food groups
     model_classifier_file : path of file containing model which predicts the food groups from nutrients
     model_matching_file : path of file containing model which predicts the food groups from names
+    group_name : specify output level of categorization ("labelAlim_1" or "labelAlim_2")
     
     -- Output --
     listing_df : the same dataframe, with 2 columns added
-        labelAlim_2 : food group for balanced meals
-        statutAlim_2: how the foodgroup has been obtained
+        labelAlim_1 or labelAlim_2 : food group for balanced meals
+        statutAlim_1 or statutAlim_2: how the foodgroup has been obtained
         
     -- Example --
     get_foodGroupFromToDF(listing_df            = input_listing, 
@@ -146,7 +148,8 @@ def get_foodGroupFromToDF(listing_df,
                           product_name_col      = 'Produit_Nom',
                           mapping_file          = 'data/mapping_off_ideal.csv',
                           model_classifier_file = 'data/clf_nutrients_rf_groupeAlim_2_light.sav',
-                          model_matching_file   = 'data/clf_names_nb_light.sav')
+                          model_matching_file   = 'data/clf_names_nb_light.sav'
+                          group_name            = 'labelAlim_1')
     '''
     
     # Check if listing_df contains EAN_col and product_name_col
@@ -164,13 +167,24 @@ def get_foodGroupFromToDF(listing_df,
         mapping_groups = pd.read_csv(mapping_file, sep = ';', encoding = 'UTF-8')
         
         # Transform into a dictionnary
-        dict_mapping = mapping_groups.set_index('pnns_groups_2')['groupeAlim_2'].to_dict()
+        dict_mapping_2 = mapping_groups.set_index('pnns_groups_2')['groupeAlim_2'].to_dict()
+        dict_mapping_1 = mapping_groups.set_index('groupeAlim_2')['groupeAlim_1'].to_dict()
         
-        # Add food group
         listing_df[['labelAlim_2', 'statutAlim_2']] = \
             listing_df.apply(lambda row: get_foodGroup(row[EAN_col], row[product_name_col],
-                                                       dict_mapping, clf_nutrients_rf, clf_names_nb), 
+                                                       dict_mapping_2, clf_nutrients_rf, clf_names_nb), 
                              axis=1, result_type='expand')
+        
+        # Add food group asked
+        if group_name == 'labelAlim_2': 
+            print('labelAlim_2 added')
+        elif group_name == 'labelAlim_1':
+            listing_df['labelAlim_1'] = listing_df['labelAlim_2'].apply(lambda x: dict_mapping_1[x])
+            listing_df['statutAlim_1'] = listing_df['statutAlim_2']
+            listing_df.drop(columns=['labelAlim_2', 'statutAlim_2'], inplace = True)
+            print('labelAlim_1 added')
+        else:
+            sys.exit('group_name arg must be labelAlim_1 or labelAlim_2')
         
         return listing_df
  
