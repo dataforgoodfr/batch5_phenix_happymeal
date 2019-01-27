@@ -17,7 +17,8 @@ __maintainer__ = 'Aoife Fogarty'
 __status__ = 'Development'
 
 
-def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, results_filename, solver):
+def optimize_baskets(listing_df, cat_distrib, cat_mandatory, delta_auth, meal_weight, 
+                     results_filename, solver):
     '''
     Args:
         listing_df (pandas df): contains weight, quantity and
@@ -37,7 +38,7 @@ def optimize_baskets(listing_df, cat_distrib, delta_auth, meal_weight, results_f
     cat_distrib_upper = {k: (v * (1 + delta_auth) * meal_weight)
                          for (k,v) in cat_distrib.items()}
     cat_distrib_lower = {k: (v * (1 - delta_auth) * meal_weight)
-                         for (k,v) in cat_distrib.items()}
+                         for (k,v) in cat_distrib.items() if k in cat_mandatory}
     cat_distrib       = {k: v for k, v in cat_distrib.items() if v > 0}
     
     # initial estimation of min and max number of meals we can make
@@ -161,22 +162,30 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
 
     # TODO load all parameters from file
     delta_auth = 0.3
-    meal_weight = 5000
+    meal_weight = 1400
+    
+    map_label2_code1, map_code1_label1 = load_category_mappings(distrib_filename)
 
     df = pd.read_csv(distrib_filename, sep=';')
     
     # eligible categories (found in listing)
     cat_ok = list(set(listing_df['codeAlim_1']))
+    cat_mandatory = list(set(df.loc[df['mandatory'] == 1, 'codeAlim_1']))
+
+    if pd.Series(cat_mandatory).isin(cat_ok).sum() < len(cat_mandatory):
+        cat_missing = pd.Series(list(set(cat_ok)-set(cat_mandatory)))
+        cat_missing_labels = cat_missing.apply(lambda x: map_code1_label1[x]).values
+        sys.exit(', '.join(cat_missing_labels) + ' are not in input listing')
 
     # for level 1 categories, we have to remove duplicates first
-    #df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
-    df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    #df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
    
     assert np.isclose(1.0, sum(cat_distrib.values()))
 
-    return cat_distrib, delta_auth, meal_weight
+    return cat_distrib, cat_mandatory, delta_auth, meal_weight
 
 
 def load_category_mappings(distrib_filename):
@@ -326,7 +335,8 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
 
     meal_domain = np.arange(0, n_meals, step = 1)
     pdt_domain = np.arange(0, n_products, step = 1)
-    cat_domain = list(cat_distrib_upper.keys())
+    cat_domain_lower = list(cat_distrib_lower.keys())
+    cat_domain_upper = list(cat_distrib_upper.keys())
 
     #print(categories)
     #print(quantities)
@@ -358,7 +368,7 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
                                     for pdt in pdt_domain \
                                     if categories[pdt] == cat)) \
                   <= cat_distrib_upper[cat]\
-                  for cat in cat_domain \
+                  for cat in cat_domain_upper \
                   for meal in meal_domain]
     constraints.extend(category_constraints)
 
@@ -366,7 +376,7 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
                                     for pdt in pdt_domain \
                                     if categories[pdt] == cat)) \
                   >= cat_distrib_lower[cat]\
-                  for cat in cat_domain \
+                  for cat in cat_domain_lower \
                   for meal in meal_domain]
     constraints.extend(category_constraints)
 
@@ -415,7 +425,9 @@ def solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
 
     meal_domain = np.arange(0, n_meals, step = 1)
     pdt_domain = listing_df.index.tolist()
-    cat_domain = list(cat_distrib_upper.keys())
+    cat_domain_lower = list(cat_distrib_lower.keys())
+    cat_domain_upper = list(cat_distrib_upper.keys())
+
 
     #print(categories)
     #print(quantities)
@@ -432,7 +444,7 @@ def solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
 
     # Objective function: maximize the weight in the baskets
     hm.setObjective(quicksum(X.sum('*', pdt) \
-                    for pdt in pdt_domain), \
+                             for pdt in pdt_domain), \
                     sense = GRB.MAXIMIZE)
 
     # Constraint: can't use more than available for each product
@@ -443,13 +455,13 @@ def solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
     hm.addConstrs(quicksum((X[meal, pdt] * pdt_info_dict['weight_grams'][pdt]) \
                            for pdt in pdt_domain if pdt_info_dict['codeAlim_1'][pdt] == cat) \
                   <= cat_distrib_upper[cat]\
-                  for cat in cat_domain \
+                  for cat in cat_domain_upper \
                   for meal in meal_domain)
     
     hm.addConstrs(quicksum((X[meal, pdt] * pdt_info_dict['weight_grams'][pdt]) \
                            for pdt in pdt_domain if pdt_info_dict['codeAlim_1'][pdt] == cat) \
                   >= cat_distrib_lower[cat]
-                  for cat in cat_domain \
+                  for cat in cat_domain_lower \
                   for meal in meal_domain)
     
     hm.Params.TimeLimit       = time_limit

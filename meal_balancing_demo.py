@@ -13,7 +13,8 @@ __status__ = 'Development'
 def main():
 
     # output of listing_categorization_demo.py
-    filename = 'data/output/61129.csv'
+    # filename = 'data/output/61129.csv'
+    filename = 'data/output/commande_100P.csv'
 
     # # ideal distribution of products in each category 10, 20, etc.
     # # categories are listed in data/food_categories.csv
@@ -37,20 +38,21 @@ def main():
     df_listing['weight_grams'] = df_listing['phenix_grams'].astype(np.float64)
     
     # output of classifier is level 2 labels but constraints are for level 1 codes
-    df_listing['codeAlim_1'] = df_listing['labelAlim_2'].apply(lambda x: map_label2_code1[x])
-    df_listing['labelAlim_1'] = df_listing['codeAlim_1'].apply(lambda x: map_code1_label1[x])
+    #df_listing['codeAlim_1'] = df_listing['labelAlim_2'].apply(lambda x: map_label2_code1[x])
+    #df_listing['labelAlim_1'] = df_listing['codeAlim_1'].apply(lambda x: map_code1_label1[x])
 
     # filter out forbidden categories
     # TODO treat these better
     df_listing = df_listing[~df_listing.codeAlim_1.isin([0,70])]
     df_listing = df_listing[~pd.isnull(df_listing['weight_grams'])]
     
-    cat_distrib, delta_auth, meal_size = load_meal_balancing_parameters(distrib_filename, df_listing)
+    cat_distrib, cat_mandatory, delta_auth, meal_size = load_meal_balancing_parameters(distrib_filename, df_listing)
     print('delta_auth', delta_auth)
     print('meal_size', meal_size)
 
-    results_filename = 'data/output/results_61129.json'
-    result = optimize_baskets(df_listing, cat_distrib, delta_auth, meal_size, results_filename, solver='GLPK')
+    results_filename = 'data/output/results_sample.json'
+    result = optimize_baskets(df_listing, cat_distrib, cat_mandatory, delta_auth, 
+                              meal_size, results_filename, solver='GLPK')
 
     print(result)
 
