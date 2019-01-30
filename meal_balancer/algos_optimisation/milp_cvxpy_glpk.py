@@ -133,7 +133,7 @@ def estimate_nmeals_max(listing_df, cat_distrib_lower):
 
     # Method 1: total weight in each category in the listing / minimum
     # weight that should be in each basket in that category
-    sum_weights = df_g['weight_grams'].values
+    sum_weights = df_g['weight_grams'].values * df_g['quantity'].values
 
     weights_in_listing = dict(zip(categories, sum_weights))
     max_meals = []
@@ -147,7 +147,7 @@ def estimate_nmeals_max(listing_df, cat_distrib_lower):
     n_meals_max_1 = min(max_meals)
 
     # Method 2: look at total number of items in each cat
-    n_meals_max_2 = np.min(df_g['quantity'].values)
+    n_meals_max_2 = np.min(df_g.loc[df_g['codeAlim_1'].isin(cat_distrib_lower.keys()), 'quantity'].values)
 
     n_meals_max = int(min(n_meals_max_1, n_meals_max_2))
 
