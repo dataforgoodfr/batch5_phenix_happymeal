@@ -313,10 +313,9 @@ def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename
             'pct_weight_allocated_items': total_weight_allocated_items / total_weight,
             'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
 
-    with open(results_filename, 'w') as f:
-        json.dump(results, f)
+    json_string = json.dumps(results)
 
-    return results
+    return json_string
 
 
 def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
