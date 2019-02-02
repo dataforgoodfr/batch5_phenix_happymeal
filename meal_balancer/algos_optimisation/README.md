@@ -61,6 +61,14 @@
 
 ### Install non-commercial solver (alternative to gurobi)
 
+#### Install of OR-Tools (Coin or Branch and Cut)
+
+See here installation instructions:
+https://developers.google.com/optimization/install/python/
+
+
+#### Install of GLPK
+
 If conda is not already installed, install anaconda or miniconda
 For example under linux
 ```
