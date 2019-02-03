@@ -74,8 +74,7 @@ def optimize_baskets(listing_df, cat_distrib, cat_mandatory, delta_auth, meal_we
     print(results_json)
 
     # get complete list of items in each basket, for output as csv
-    #df_solution = postprocess_optimised_solution(solution)
-    df_solution = None  # TODO
+    df_solution = postprocess_optimised_solution(solution, listing_df)
 
     return df_solution, results_json
 
@@ -164,6 +163,8 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
         distrib_filename (str): containing ideal distribution and food categories
     '''
     
+    cat_status = 1
+    
     map_label2_code1, map_code1_label1 = load_category_mappings(distrib_filename)
 
     df = pd.read_csv(distrib_filename, sep=';')
@@ -175,7 +176,9 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
     if pd.Series(cat_mandatory).isin(cat_ok).sum() < len(cat_mandatory):
         cat_missing = pd.Series(list(set(cat_ok)-set(cat_mandatory)))
         cat_missing_labels = cat_missing.apply(lambda x: map_code1_label1[x]).values
-        sys.exit(', '.join(cat_missing_labels) + ' are not in input listing')
+        cat_status = 0
+        print(', '.join(cat_missing_labels) + ' are not in input listing')
+        #sys.exit(', '.join(cat_missing_labels) + ' are not in input listing')
 
     # for level 1 categories, we have to remove duplicates first
     df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
@@ -183,9 +186,9 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
    
-    assert np.isclose(1.0, sum(cat_distrib.values()))
+    # assert np.isclose(1.0, sum(cat_distrib.values()))
 
-    return cat_distrib, cat_mandatory
+    return cat_distrib, cat_mandatory, cat_status
 
 
 def load_category_mappings(distrib_filename):
@@ -254,7 +257,36 @@ def postprocess_optimised_solution(solution, listing_df):
         dataframe with one line for each item, and column
         'allocated_basket' (0 if item was not allocated)
     '''
-    pass
+
+    names      = listing_df['Produit_Nom'].values
+    ean        = listing_df['EAN'].values
+    categories = listing_df['labelAlim_1'].values
+    weights    = listing_df['weight_grams'].values
+
+    meal_domain = range(solution.shape[0])
+    pdt_domain = range(solution.shape[1])
+
+    # init for remaining items basket
+    df_solution = listing_df[['Produit_Nom', 'EAN', 'labelAlim_1', 'quantity', 'weight_grams']]
+    df_solution['allocated_basket'] = 0
+    
+    for pdt in pdt_domain:
+        for meal in meal_domain:
+            if solution[meal, pdt] > 0:
+                df_solution = df_solution.append({
+                        'Produit_Nom': names[pdt],
+                        'EAN': ean[pdt],
+                        'labelAlim_1': categories[pdt],
+                        'quantity': solution[meal, pdt],
+                        'weight_grams': weights[pdt],
+                        'allocated_basket': meal+1                        
+                        }, ignore_index = True)
+                # update remaining quantity of product pdt
+                df_solution.iloc[pdt, 3] = df_solution.iloc[pdt, 3]-solution[meal, pdt]
+    # remove rows if no item
+    df_solution = df_solution.loc[df_solution['quantity'] > 0, ]
+    
+    return(df_solution)
 
 
 def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename):
@@ -317,7 +349,7 @@ def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename
     with open(results_filename, 'w') as f:
         json.dump(results, f)
 
-    return 0
+    return json.dumps(results)
 
 
 def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):

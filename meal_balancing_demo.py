@@ -53,10 +53,13 @@ def main():
     df_listing = df_listing[~df_listing.codeAlim_1.isin([0,70])]
     df_listing = df_listing[~pd.isnull(df_listing['weight_grams'])]
     
-    cat_distrib, cat_mandatory = load_meal_balancing_parameters(distrib_filename, df_listing)
+    cat_distrib, cat_mandatory, cat_status = load_meal_balancing_parameters(distrib_filename, df_listing)
 
-    result = optimize_baskets(df_listing, cat_distrib, cat_mandatory, delta_auth, 
-                              meal_weight, results_filename, solver='CBC')
+    if cat_status == 1:
+        result = optimize_baskets(df_listing, cat_distrib, cat_mandatory, delta_auth, 
+                                  meal_weight, results_filename, solver='CBC')
+    else:
+        result = None
 
     print(result)
 
