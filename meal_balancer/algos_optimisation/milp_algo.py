@@ -174,7 +174,7 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
     cat_mandatory = list(set(df.loc[df['mandatory'] == 1, 'codeAlim_1']))
 
     if pd.Series(cat_mandatory).isin(cat_ok).sum() < len(cat_mandatory):
-        cat_missing = pd.Series(list(set(cat_ok)-set(cat_mandatory)))
+        cat_missing = pd.Series(list(set(cat_mandatory)-set(cat_ok)))
         cat_missing_labels = cat_missing.apply(lambda x: map_code1_label1[x]).values
         cat_status = 0
         print(', '.join(cat_missing_labels) + ' are not in input listing')
