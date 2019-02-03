@@ -21,10 +21,10 @@ from utils.off_mgt import get_product_information, convert_to_gram, parse_qty_in
 #args = parser.parse_args()
 
 
-listing_file          = 'commande_94349.csv'  #  'commande_81708.csv'
-mapping_file          = 'data/mapping_off_ideal.csv'
+listing_file = 'commande_94349.csv'  #  'commande_81708.csv'
+mapping_file = 'data/mapping_off_ideal.csv'
 model_classifier_file = 'data/clf_nutrients_rf_groupeAlim_2_light.sav'
-model_matching_file   = 'data/clf_names_nb_light.sav'
+model_matching_file = 'data/clf_names_nb_light.sav'
 
 
 def parse_phenix_grams(product_name):
@@ -76,7 +76,7 @@ def main():
                                              mapping_file=mapping_file,
                                              model_classifier_file=model_classifier_file,
                                              model_matching_file=model_matching_file,
-                                             group_name = 'labelAlim_1')
+                                             group_name='labelAlim_1')
     print("category added")
     print(input_listing)
     print(input_listing.columns)
