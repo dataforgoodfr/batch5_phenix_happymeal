@@ -183,10 +183,13 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
     # for level 1 categories, we have to remove duplicates first
     df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
     #df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
+    
+    # transform to 100% 
+    df['idealDistrib_1'] = df['idealDistrib_1']*(1/sum(df['idealDistrib_1'].values))
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
    
-    # assert np.isclose(1.0, sum(cat_distrib.values()))
+    assert np.isclose(1.0, sum(cat_distrib.values()))
 
     return cat_distrib, cat_mandatory, cat_status
 
@@ -258,35 +261,38 @@ def postprocess_optimised_solution(solution, listing_df):
         'allocated_basket' (0 if item was not allocated)
     '''
 
-    names      = listing_df['Produit_Nom'].values
-    ean        = listing_df['EAN'].values
-    categories = listing_df['labelAlim_1'].values
-    weights    = listing_df['weight_grams'].values
-
-    meal_domain = range(solution.shape[0])
-    pdt_domain = range(solution.shape[1])
-
-    # init for remaining items basket
-    df_solution = listing_df[['Produit_Nom', 'EAN', 'labelAlim_1', 'quantity', 'weight_grams']]
-    df_solution['allocated_basket'] = 0
+    if solution is None:
+        return None
+    else:
+        names      = listing_df['Produit_Nom'].values
+        ean        = listing_df['EAN'].values
+        categories = listing_df['labelAlim_1'].values
+        weights    = listing_df['weight_grams'].values
     
-    for pdt in pdt_domain:
-        for meal in meal_domain:
-            if solution[meal, pdt] > 0:
-                df_solution = df_solution.append({
-                        'Produit_Nom': names[pdt],
-                        'EAN': ean[pdt],
-                        'labelAlim_1': categories[pdt],
-                        'quantity': solution[meal, pdt],
-                        'weight_grams': weights[pdt],
-                        'allocated_basket': meal+1                        
-                        }, ignore_index = True)
-                # update remaining quantity of product pdt
-                df_solution.iloc[pdt, 3] = df_solution.iloc[pdt, 3]-solution[meal, pdt]
-    # remove rows if no item
-    df_solution = df_solution.loc[df_solution['quantity'] > 0, ]
+        meal_domain = range(solution.shape[0])
+        pdt_domain = range(solution.shape[1])
     
-    return(df_solution)
+        # init for remaining items basket
+        df_solution = listing_df[['Produit_Nom', 'EAN', 'labelAlim_1', 'quantity', 'weight_grams']]
+        df_solution['allocated_basket'] = 0
+        
+        for pdt in pdt_domain:
+            for meal in meal_domain:
+                if solution[meal, pdt] > 0:
+                    df_solution = df_solution.append({
+                            'Produit_Nom': names[pdt],
+                            'EAN': ean[pdt],
+                            'labelAlim_1': categories[pdt],
+                            'quantity': solution[meal, pdt],
+                            'weight_grams': weights[pdt],
+                            'allocated_basket': meal+1                        
+                            }, ignore_index = True)
+                    # update remaining quantity of product pdt
+                    df_solution.iloc[pdt, 3] = df_solution.iloc[pdt, 3]-solution[meal, pdt]
+        # remove rows if no item
+        df_solution = df_solution.loc[df_solution['quantity'] > 0, ]
+        
+        return(df_solution)
 
 
 def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename):

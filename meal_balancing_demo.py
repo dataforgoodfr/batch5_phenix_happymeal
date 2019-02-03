@@ -33,7 +33,7 @@ def main():
     delta_auth = 0.5
     meal_weight = 5000
     print('delta_auth', delta_auth)
-    print('meal_size', meal_size)
+    print('meal_weight', meal_weight)
 
     distrib_filename = 'data/food_categories.csv'
     
