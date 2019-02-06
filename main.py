@@ -15,41 +15,38 @@ def main():
     request_id = args.request_id
 
     test_result = {
-            
-        "pct_input_items": [
-                ["Viande, poisson, oeufs", 0.055366335703336746], 
-                ["Produits gras sucr\u00e9s sal\u00e9s", 0.24074123343360457], 
-                ["Mati\u00e8res grasses ajout\u00e9es", 0.013074132356507211], 
-                ["Produits laitiers", 0.06832168022871912], 
-                ["F\u00e9culents", 0.02283490602723674], 
-                ["Fruits et l\u00e9gumes", 0.5996617122505956]],
-                
-        "pct_allocated_items": [
-                ["Viande, poisson, oeufs", 0.003735466387573489], 
-                ["Produits gras sucr\u00e9s sal\u00e9s", 0.0], 
-                ["Mati\u00e8res grasses ajout\u00e9es", 0.0], 
-                ["Produits laitiers", 0.010496660549081504], 
-                ["F\u00e9culents", 0.00864013375445748], 
-                ["Fruits et l\u00e9gumes", 0.013292034562449]], 
-                
-        "pct_remaining_items": [
-                ["Viande, poisson, oeufs", 0.05163086931576326], 
-                ["Produits gras sucr\u00e9s sal\u00e9s", 0.24074123343360457], 
-                ["Mati\u00e8res grasses ajout\u00e9es", 0.013074132356507211], 
-                ["Produits laitiers", 0.057825019679637615], 
-                ["F\u00e9culents", 0.014194772272779259], 
-                ["Fruits et l\u00e9gumes", 0.5863696776881466]], 
-                
-        "nb_balanced_meals": 7, 
-        "nb_allocated_items": 41, 
-        "nb_remaining_items": 380, 
-        "total_input_weight": 267704, 
-        "total_allocated_weight": 9681, 
-        "total_weight_remaining_items": 258022, 
-        "pct_weight_allocated_items": 0.036164295253561476, 
-        "pct_weight_remaining_items": 0.9638357047464385
-        }
-
+           "pct_input_items": [
+                   ["Viande, poisson, oeufs", 0.06121894571887815], 
+                   ["Produits gras sucr\u00e9s sal\u00e9s", 0.24292811142750698], 
+                   ["Produits laitiers", 0.17405525299186245], 
+                   ["F\u00e9culents", 0.05400006425838616], 
+                   ["Fruits et l\u00e9gumes", 0.46779762560336624]], 
+                   
+           "pct_allocated_items": [
+                   ["Viande, poisson, oeufs", 0.03220187318160643], 
+                   ["Produits gras sucr\u00e9s sal\u00e9s", 0.0],
+                   ["Produits laitiers", 0.058458785160454746], 
+                   ["F\u00e9culents", 0.050697308034631655], 
+                   ["Fruits et l\u00e9gumes", 0.11917912945713675]], 
+                   
+           "pct_remaining_items": [
+                   ["Viande, poisson, oeufs", 0.029017072537271725], 
+                   ["Produits gras sucr\u00e9s sal\u00e9s", 0.24292811142750698], 
+                   ["Produits laitiers", 0.11559646783140769], 
+                   ["F\u00e9culents", 0.0033027562237545054], 
+                   ["Fruits et l\u00e9gumes", 0.3486184961462295]], 
+                   
+           "nb_balanced_meals": 8, 
+           "nb_allocated_items": 52, 
+           "nb_remaining_items": 89, 
+           "total_input_weight": 60555, 
+           "total_allocated_weight": 15776, 
+           "total_weight_remaining_items": 44778, 
+           "pct_weight_allocated_items": 0.2605370958338296, 
+           "pct_weight_remaining_items": 0.7394629041661704
+           
+            }
+    
     print(json.dumps(test_result))
 
 
