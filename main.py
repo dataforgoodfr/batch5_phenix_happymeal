@@ -65,11 +65,7 @@ def main():
         "pct_weight_remaining_items": 0.6
     }
 
-    output_filename = 'output/{}_results.json'.format(request_id)
-    with open(output_filename, 'w') as f:
-        json.dump(test_result, f)
-
-    return 0
+    print json.dumps(test_result)
 
 
 if __name__ == '__main__':
