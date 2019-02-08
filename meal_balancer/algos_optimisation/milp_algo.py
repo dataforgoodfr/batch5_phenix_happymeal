@@ -47,7 +47,8 @@ def optimize_baskets(listing_df, cat_distrib, cat_mandatory, delta_auth, meal_we
     
     # initial estimation of min and max number of meals we can make
     n_meals_max = estimate_nmeals_max(listing_df, cat_distrib_lower)
-    n_meals_min = estimate_nmeals_min(listing_df, cat_distrib, meal_weight)
+    n_meals_min = 1
+    # n_meals_min = estimate_nmeals_min(listing_df, cat_distrib, meal_weight)
     print('Trying to find between {} and {} meals'.format(n_meals_min, n_meals_max))
 
     # initialise solution matrix
@@ -71,7 +72,7 @@ def optimize_baskets(listing_df, cat_distrib, cat_mandatory, delta_auth, meal_we
 
     # postprocess solution to get jsons for plotting
     results_json = postprocess_optimised_solution_for_ui(solution, listing_df, results_filename)
-    print(results_json)
+    #print(results_json)
 
     # get complete list of items in each basket, for output as csv
     df_solution = postprocess_optimised_solution(solution, listing_df)
@@ -185,11 +186,12 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
     #df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
     
     # transform to 100% 
-    df['idealDistrib_1'] = df['idealDistrib_1']*(1/sum(df['idealDistrib_1'].values))
+    if cat_status == 1:
+        df['idealDistrib_1'] = df['idealDistrib_1']*(1/sum(df['idealDistrib_1'].values))
 
     cat_distrib = dict(zip(df['codeAlim_1'].values, df['idealDistrib_1'].values))
    
-    assert np.isclose(1.0, sum(cat_distrib.values()))
+    # assert np.isclose(1.0, sum(cat_distrib.values()))
 
     return cat_distrib, cat_mandatory, cat_status
 
@@ -332,23 +334,33 @@ def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename
     total_weight_remaining_items = np.sum(df_g['remaining_weighted'].values)
     total_weight = total_weight_allocated_items + total_weight_remaining_items
 
+    df_g['input_weighted_frac'] = (df_g['allocated_weighted'] + df_g['remaining_weighted'])/ total_weight
+
     if total_weight_allocated_items > 0:
-        df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / total_weight_allocated_items
+        # df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / total_weight_allocated_items
+        df_g['allocated_weighted_frac'] = df_g['allocated_weighted'] / total_weight
     else: 
         df_g['allocated_weighted_frac'] = 0.0
+        
     if total_weight_remaining_items > 0:
-        df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / total_weight_remaining_items
+        # df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / total_weight_remaining_items
+        df_g['remaining_weighted_frac'] = df_g['remaining_weighted'] / total_weight
     else:
         df_g['remaining_weighted_frac'] = 0.0
 
     results = {
-            'allocated_items': list(zip(df_g['labelAlim_1'].values,
+            'pct_input_items'    : list(zip(df_g['labelAlim_1'].values,
+                                        df_g['input_weighted_frac'].values)),
+            'pct_allocated_items': list(zip(df_g['labelAlim_1'].values,
                                         df_g['allocated_weighted_frac'].values)),
-            'remaining_items': list(zip(df_g['labelAlim_1'].values,
+            'pct_remaining_items': list(zip(df_g['labelAlim_1'].values,
                                         df_g['remaining_weighted_frac'].values)),
             'nb_balanced_meals': int(n_balanced_meals),
             'nb_allocated_items': int(n_allocated_items),
             'nb_remaining_items': int(n_remaining_items),
+            'total_input_weight': int(total_weight),
+            'total_allocated_weight': int(total_weight_allocated_items),
+            'total_weight_remaining_items': int(total_weight_remaining_items),
             'pct_weight_allocated_items': total_weight_allocated_items / total_weight,
             'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
 
@@ -460,14 +472,16 @@ def solver_cbc(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
     
     # CP-SAT solver is integer only.
    
-    weights = listing_df['weight_grams'].values
+    weights = np.floor(listing_df['weight_grams'].values).astype(int)
     categories = listing_df['codeAlim_1'].values
-    quantities = listing_df['quantity'].values
+    quantities = np.floor(listing_df['quantity'].values).astype(int)
     
     n_products = len(listing_df)
     meal_domain = range(n_meals)
     pdt_domain = range(n_products)
     
+    cat_distrib_lower = {k: math.ceil(v) for (k,v) in cat_distrib_lower.items()}
+    cat_distrib_upper = {k: math.floor(v) for (k,v) in cat_distrib_upper.items()}
     
     cat_domain_lower = list(cat_distrib_lower.keys())
     cat_domain_upper = list(cat_distrib_upper.keys())
@@ -487,33 +501,33 @@ def solver_cbc(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
 
     # Each product i is assigned to a meal and only one.
     for pdt in pdt_domain:
-        model.Add(sum(x[meal, pdt] for meal in meal_domain) <= math.floor(quantities[pdt]))
+        model.Add(sum(x[meal, pdt] for meal in meal_domain) <= quantities[pdt])
 
     # Can't oversize a category too much    
     for meal in meal_domain:
         for cat in cat_domain_upper:
-            model.Add(sum(x[meal, pdt]*math.ceil(weights[pdt]) \
+            model.Add(sum(x[meal, pdt]*weights[pdt] \
                           for pdt in pdt_domain if categories[pdt] == cat) 
-                      <= math.floor(cat_distrib_upper[cat]))
+                      <= cat_distrib_upper[cat])
             
     # Can't undersize a category too much      
     for meal in meal_domain:
         for cat in cat_domain_lower:       
-            model.Add(sum(x[meal, pdt]*math.floor(weights[pdt]) \
+            model.Add(sum(x[meal, pdt]*weights[pdt] \
                           for pdt in pdt_domain if categories[pdt] == cat) 
-                      >= math.ceil(cat_distrib_lower[cat]))
+                      >= cat_distrib_lower[cat])
 
     # Objective
-    model.Maximize(sum(x[meal, pdt]*math.floor(weights[pdt]) \
+    model.Maximize(sum(x[meal, pdt]*weights[pdt] \
                        for pdt in pdt_domain \
                        for meal in meal_domain))
 
     # Solve and print out the solution
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 5
+    solver.parameters.max_time_in_seconds = 2
     objective_printer = ObjectivePrinter()
     status = solver.SolveWithSolutionCallback(model, objective_printer)
-    print(solver.ResponseStats())
+    #print(solver.ResponseStats())
     
     x_matrix = np.zeros([n_meals, n_products], dtype = int)
     
@@ -522,7 +536,7 @@ def solver_cbc(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
             print('Meal %i' % i)
             for j in pdt_domain:
                 if solver.Value(x[i, j]):
-                    print('  - Product %i' % j + ' : ' + str(solver.Value(x[i, j])))
+                    #print('  - Product %i' % j + ' : ' + str(solver.Value(x[i, j])))
                     x_matrix[i, j] = solver.Value(x[i, j])
         print(str(solver.ObjectiveValue()) + 'g allocated')
         return x_matrix
