@@ -90,7 +90,7 @@ def create_batches(items, balanced_split, batch_qty, overflow_thresh=0., underfl
     # print('Maximum number of balanced batches: %s' % theoretical_limit)
 
     # Check balanced split
-    if sum(balanced_split.values()) != 1.0:
+    if round(sum(balanced_split.values()), 2) != 1.00:
         raise ValueError('A balanced split must have category proportions summing up to 1')
 
     # Expected quantities
