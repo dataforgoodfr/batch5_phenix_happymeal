@@ -147,10 +147,12 @@ def get_foodGroupFromToDF(listing_df,
 
     else:
         # Model to get the foodgroup of a product which is in the Open Food Facts database
-        clf_nutrients_rf = pickle.load(open(model_classifier_file, 'rb'))
+        with open(model_classifier_file, 'rb') as f:
+            clf_nutrients_rf = pickle.load(f)
 
         # Model to get the foodgroup of a product which is not in the Open Food Facts database
-        clf_names_nb = pickle.load(open(model_matching_file, 'rb'))
+        with open(model_matching_file, 'rb') as f:
+            clf_names_nb = pickle.load(f)
 
         # Mapping file
         mapping_groups = pd.read_csv(mapping_file, sep=';', encoding='UTF-8')
