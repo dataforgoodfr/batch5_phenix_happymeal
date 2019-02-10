@@ -1,0 +1,20 @@
+category,aggregation_level,donation_proportion,average_price
+Produits gras sucrés salés,2,0.214,4
+Plats préparés,2,0.172,7
+Légumes,2,0.128,2.5
+Produits laitiers (hors fromage),2,0.128,1.5
+"Viande, œufs",2,0.126,6
+Féculents raffinés,2,0.101,2
+Fruits,2,0.046,2.5
+Fromage,2,0.04,7
+Poisson,2,0.019,15
+Matières grasses ajoutées,2,0.015,5
+Féculents non raffinés,2,0.008,1.5
+Exclus,1,,
+"Viande, poisson, oeufs",1,0.145,10.5
+Produits gras sucrés salés,1,0.214,4
+Matières grasses ajoutées,1,0.015,5
+Produits laitiers,1,0.168,4.25
+Féculents,1,0.109,1.75
+Fruits et légumes,1,0.174,2.5
+Plats préparés,1,0.172,7
