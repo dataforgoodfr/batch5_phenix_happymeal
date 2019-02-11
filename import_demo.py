@@ -119,7 +119,6 @@ def main():
     # categ_prices = {cat: 1e-3 for cat in req_portions.keys()}
     res = tier_completion(req_portions, categ_prices, ideal_split, batch_qty=args.batch_qty)
 
-
     # Result printing
     print(f"Listing split: {input_listing.groupby('group_name').quantity.sum()}")
     print(f"Missing categories: {[elt for elt, val in ideal_split.items() if val > 0 and elt not in input_listing.group_name]}")
