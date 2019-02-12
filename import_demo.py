@@ -87,6 +87,8 @@ def main():
     input_listing.quantity = np.floor(input_listing.quantity)
     int_cols = ['ean', 'group_method', 'quantity']
     input_listing[int_cols] = input_listing[int_cols].astype(int)
+    # Uncomment to filter out prepared meals
+    # input_listing = input_listing[input_listing.group_name != 'Plats préparés']
 
     # Get ideal split
     ideal_split = pd.read_csv(os.path.join('data', 'food_categories.csv'), sep=';')
@@ -102,7 +104,6 @@ def main():
         # Quantity
         items.extend([dict(category=row['group_name'], quantity=row['weight_grams'])
                       for ex in range(row['quantity'])])
-
     all_batches, storage, big_items, unidentified, tmp_items, loss = create_batches(items, ideal_split,
                                                                                     batch_qty=args.batch_qty,
                                                                                     overflow_thresh=0.5,
@@ -125,7 +126,7 @@ def main():
     print(f'Big items: {len(big_items)}')
     print(f'Unidentified: {len(unidentified)}')
     for tier in res:
-        print(f"{tier.get('nb_meals')} meals at {tier.get('meal_price')} unit price (buying {tier.get('categ_bought')})")
+        print(f"{tier.get('nb_meals')} meals at {tier.get('meal_price')} unit price (buying {list(tier.get('categ_bought').keys())})")
 
     # write output file
     input_listing.to_csv(os.path.join('data', 'output', f"commande_{args.order_id}.csv"),

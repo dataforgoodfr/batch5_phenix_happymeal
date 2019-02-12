@@ -12,6 +12,7 @@ __maintainer__ = 'François-Guillaume Fernandez'
 __status__ = 'Development'
 
 from meal_balancer.grouping import Pile
+from copy import deepcopy
 
 
 def missing_balance(unbalanced_items, split_categ):
@@ -47,16 +48,16 @@ def tier_completion(required_portions, categ_prices, ideal_split, batch_qty=500)
         required_items (dict): dictionary item categ --> missing quantity
     """
 
-    meal_prices, nb_meals = [], []
-
-    # Categories to buy
-    tmp_dict = {key: val for key, val in required_portions.items()}
+    # meal_prices, nb_meals = [], []
+    res = []
 
     # Sort by the number of portions required
-    tmp_vals = sorted(list(set(tmp_dict.values())), reverse=True)
+    tmp_vals = sorted(list(set(required_portions.values())), reverse=True)
     # Get a list of each categ missing by tier
-    buying_categs = [[]] * (len(tmp_vals) - 1)
-    for categ, categ_need in tmp_dict.items():
+    buying_categs = []
+    for idx in range(len(tmp_vals) - 1):
+        buying_categs.append([])
+    for categ, categ_need in required_portions.items():
         if categ_need > 0:
             buying_categs[tmp_vals.index(categ_need)].append(categ)
     # Loop on increasingly needed categ
@@ -64,10 +65,10 @@ def tier_completion(required_portions, categ_prices, ideal_split, batch_qty=500)
     for idx, categs in enumerate(buying_categs):
         running_categs.extend(categs)
         # get the price per extra meal
-        meal_prices.append(batch_qty / 1000 * sum([ideal_split[cat] * categ_prices[cat] for cat in running_categs]))
-        nb_meals.append(tmp_vals[idx] - tmp_vals[idx + 1])
-
-    res = [dict(nb_meals=tier_meals, meal_price=meal_prices[idx], categ_bought=buying_categs[idx])
-           for idx, tier_meals in enumerate(nb_meals)]
+        # meal_prices.append(batch_qty / 1000 * sum([ideal_split[cat] * categ_prices[cat] for cat in running_categs]))
+        # nb_meals.append(tmp_vals[idx] - tmp_vals[idx + 1])
+        res.append(dict(nb_meals=tmp_vals[idx] - tmp_vals[idx + 1],
+                        meal_price=batch_qty / 1000 * sum([ideal_split[cat] * categ_prices[cat] for cat in running_categs]),
+                        categ_bought={cat: batch_qty / 1000 * ideal_split[cat] for cat in running_categs}))
 
     return res
