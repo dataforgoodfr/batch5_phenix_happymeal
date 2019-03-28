@@ -21,8 +21,13 @@ __maintainer__ = 'Aoife Fogarty'
 __status__ = 'Development'
 
 
-def optimize_baskets(listing_df, cat_distrib, cat_mandatory, delta_auth, meal_weight, 
-                     results_filename, solver):
+def optimize_baskets(listing_df, 
+                     cat_distrib, 
+                     cat_mandatory, 
+                     delta_auth, 
+                     meal_weight, 
+                     results_filename, 
+                     solver):
     '''
     Args:
         listing_df (pandas df): contains weight, quantity and
@@ -98,7 +103,7 @@ def estimate_nmeals_min(listing_df, cat_distrib, meal_weight):
 
     # put items in format needed by create_batches
     df_new = df_new.reset_index(drop=True)\
-                   .rename(columns={'codeAlim_1': 'category',
+                   .rename(columns={'group_code': 'category',
                                     'weight_grams': 'quantity'})
     items = df_new[['category', 'quantity']].to_dict(orient='records')
 
@@ -132,8 +137,8 @@ def estimate_nmeals_max(listing_df, cat_distrib_lower):
     #         return 0, 0
 
     # Use two different methods to estimate the maximum number of possible meals
-    df_g = listing_df.groupby('codeAlim_1', as_index=False).agg({'weight_grams': 'sum', 'quantity': 'sum'})
-    categories = df_g.codeAlim_1.values
+    df_g = listing_df.groupby('group_code', as_index=False).agg({'weight_grams': 'sum', 'quantity': 'sum'})
+    categories = df_g.group_code.values
 
     # Method 1: total weight in each category in the listing / minimum
     # weight that should be in each basket in that category
@@ -151,14 +156,14 @@ def estimate_nmeals_max(listing_df, cat_distrib_lower):
     n_meals_max_1 = min(max_meals)
 
     # Method 2: look at total number of items in each cat
-    n_meals_max_2 = np.min(df_g.loc[df_g['codeAlim_1'].isin(cat_distrib_lower.keys()), 'quantity'].values)
+    n_meals_max_2 = np.min(df_g.loc[df_g['group_code'].isin(cat_distrib_lower.keys()), 'quantity'].values)
 
     n_meals_max = int(min(n_meals_max_1, n_meals_max_2))
 
     return n_meals_max
 
 
-def load_meal_balancing_parameters(distrib_filename, listing_df):
+def load_meal_balancing_parameters(distrib_filename, listing_df, listing_code_name):
     '''
     Args:
         distrib_filename (str): containing ideal distribution and food categories
@@ -166,12 +171,12 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
     
     cat_status = 1
     
-    map_label2_code1, map_code1_label1 = load_category_mappings(distrib_filename)
+    map_label2_code1, map_code1_label1, map_label1_code1 = load_category_mappings(distrib_filename)
 
     df = pd.read_csv(distrib_filename, sep=';')
     
     # eligible categories (found in listing)
-    cat_ok = list(set(listing_df['codeAlim_1']))
+    cat_ok = list(set(listing_df[listing_code_name]))
     cat_mandatory = list(set(df.loc[df['mandatory'] == 1, 'codeAlim_1']))
 
     if pd.Series(cat_mandatory).isin(cat_ok).sum() < len(cat_mandatory):
@@ -183,7 +188,6 @@ def load_meal_balancing_parameters(distrib_filename, listing_df):
 
     # for level 1 categories, we have to remove duplicates first
     df = df.loc[df['codeAlim_1'].isin(cat_ok),].drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
-    #df = df.drop_duplicates(['codeAlim_1', 'idealDistrib_1'])
     
     # transform to 100% 
     if cat_status == 1:
@@ -208,8 +212,10 @@ def load_category_mappings(distrib_filename):
                                 df['codeAlim_1'].values))
     map_code1_label1 = dict(zip(df['codeAlim_1'].values,
                                 df['labelAlim_1'].values))
+    map_label1_code1 = dict(zip(df['labelAlim_1'].values,
+                                df['codeAlim_1'].values))
 
-    return map_label2_code1, map_code1_label1
+    return map_label2_code1, map_code1_label1, map_label1_code1
 
 
 def optimize_baskets_for_nmeals(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals, solver):
@@ -266,25 +272,25 @@ def postprocess_optimised_solution(solution, listing_df):
     if solution is None:
         return None
     else:
-        names      = listing_df['Produit_Nom'].values
-        ean        = listing_df['EAN'].values
-        categories = listing_df['labelAlim_1'].values
+        names      = listing_df['product_name'].values
+        ean        = listing_df['ean'].values
+        categories = listing_df['group_name'].values
         weights    = listing_df['weight_grams'].values
     
         meal_domain = range(solution.shape[0])
         pdt_domain = range(solution.shape[1])
     
         # init for remaining items basket
-        df_solution = listing_df[['Produit_Nom', 'EAN', 'labelAlim_1', 'quantity', 'weight_grams']]
+        df_solution = listing_df[['product_name', 'ean', 'group_name', 'quantity', 'weight_grams']]
         df_solution['allocated_basket'] = 0
         
         for pdt in pdt_domain:
             for meal in meal_domain:
                 if solution[meal, pdt] > 0:
                     df_solution = df_solution.append({
-                            'Produit_Nom': names[pdt],
-                            'EAN': ean[pdt],
-                            'labelAlim_1': categories[pdt],
+                            'product_name': names[pdt],
+                            'ean': ean[pdt],
+                            'group_name': categories[pdt],
                             'quantity': solution[meal, pdt],
                             'weight_grams': weights[pdt],
                             'allocated_basket': meal+1                        
@@ -326,7 +332,7 @@ def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename
     listing_df['allocated_weighted'] = allocated * listing_df['weight_grams']
     listing_df['remaining_weighted'] = remaining * listing_df['weight_grams']
 
-    df_g = listing_df.groupby(['codeAlim_1', 'labelAlim_1'],
+    df_g = listing_df.groupby(['group_code', 'group_name'],
                               as_index=False).agg({'allocated_weighted': 'sum',
                                                    'remaining_weighted': 'sum'})
 
@@ -349,11 +355,11 @@ def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename
         df_g['remaining_weighted_frac'] = 0.0
 
     results = {
-            'pct_input_items'    : list(zip(df_g['labelAlim_1'].values,
+            'pct_input_items'    : list(zip(df_g['group_name'].values,
                                         df_g['input_weighted_frac'].values)),
-            'pct_allocated_items': list(zip(df_g['labelAlim_1'].values,
+            'pct_allocated_items': list(zip(df_g['group_name'].values,
                                         df_g['allocated_weighted_frac'].values)),
-            'pct_remaining_items': list(zip(df_g['labelAlim_1'].values,
+            'pct_remaining_items': list(zip(df_g['group_name'].values,
                                         df_g['remaining_weighted_frac'].values)),
             'nb_balanced_meals': int(n_balanced_meals),
             'nb_allocated_items': int(n_allocated_items),
@@ -364,10 +370,10 @@ def postprocess_optimised_solution_for_ui(solution, listing_df, results_filename
             'pct_weight_allocated_items': total_weight_allocated_items / total_weight,
             'pct_weight_remaining_items': total_weight_remaining_items / total_weight}
 
-    with open(results_filename, 'w') as f:
-        json.dump(results, f)
+    with open(results_filename, 'w', encoding='utf8') as f:
+        json.dump(results, f, ensure_ascii=False)
 
-    return json.dumps(results)
+    return json.dumps(results, ensure_ascii=False).encode('utf8')
 
 
 def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
@@ -381,7 +387,7 @@ def solver_cvxpy_glpk(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals)
 
     n_products = len(listing_df)
     weights = listing_df['weight_grams'].values
-    categories = listing_df['codeAlim_1'].values
+    categories = listing_df['group_code'].values
     quantities = listing_df['quantity'].values
 
     meal_domain = np.arange(0, n_meals, step = 1)
@@ -473,7 +479,7 @@ def solver_cbc(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
     # CP-SAT solver is integer only.
    
     weights = np.floor(listing_df['weight_grams'].values).astype(int)
-    categories = listing_df['codeAlim_1'].values
+    categories = listing_df['group_code'].values
     quantities = np.floor(listing_df['quantity'].values).astype(int)
     
     n_products = len(listing_df)
@@ -564,7 +570,7 @@ def solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
     
     n_products = len(listing_df)
     weights = listing_df['weight_grams'].values
-    categories = listing_df['codeAlim_1'].values
+    categories = listing_df['group_code'].values
     quantities = listing_df['quantity'].values
 
     meal_domain = np.arange(0, n_meals, step = 1)
@@ -602,13 +608,13 @@ def solver_gurobi(listing_df, cat_distrib_upper, cat_distrib_lower, n_meals):
 
     # Constraint: can't oversize or undersize a category too much
     hm.addConstrs(quicksum((X[meal, pdt] * pdt_info_dict['weight_grams'][pdt]) \
-                           for pdt in pdt_domain if pdt_info_dict['codeAlim_1'][pdt] == cat) \
+                           for pdt in pdt_domain if pdt_info_dict['group_code'][pdt] == cat) \
                   <= cat_distrib_upper[cat]\
                   for cat in cat_domain_upper \
                   for meal in meal_domain)
     
     hm.addConstrs(quicksum((X[meal, pdt] * pdt_info_dict['weight_grams'][pdt]) \
-                           for pdt in pdt_domain if pdt_info_dict['codeAlim_1'][pdt] == cat) \
+                           for pdt in pdt_domain if pdt_info_dict['group_code'][pdt] == cat) \
                   >= cat_distrib_lower[cat]
                   for cat in cat_domain_lower \
                   for meal in meal_domain)
