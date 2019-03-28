@@ -118,10 +118,10 @@ def main():
                                   args.meal_weight, 
                                   results_filename, 
                                   solver='CBC')
-        print('Meals found')
+        print('Optimization done')
     else:
         result = None
-        print('No meal found')
+        print('No meal can be found')
 
 
 if __name__ == '__main__':
