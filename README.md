@@ -22,7 +22,7 @@ This algorithm works as follow:
     - if not, then compute the average of article's category quantities
 - If the article is rice, semolina, pasta or instant mashed potatoes, then multiply by a specific coefficient
 ### Optimizer
-Description can be found [here](https://github.com/dataforgoodfr/batch5_phenix_happymeal/tree/master/algos-optimisation).
+Description can be found [here](https://github.com/dataforgoodfr/batch5_phenix_happymeal/tree/master/meal_balancer/algos_optimisation).
 ### Reallocating remaining articles
 _add a description here_
 
