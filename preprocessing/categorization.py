@@ -129,7 +129,7 @@ def get_foodGroupFromToDF(listing_df,
     -- Output --
     listing_df: the same dataframe, with 2 columns added
         labelAlim_1 or labelAlim_2: food group for balanced meals
-        statutAlim_1 or statutAlim_2: how the foodgroup has been obtained
+        group_method: how the foodgroup has been obtained
 
     -- Example --
     get_foodGroupFromToDF(listing_df            = input_listing,
@@ -161,7 +161,7 @@ def get_foodGroupFromToDF(listing_df,
         dict_mapping_2 = mapping_groups.set_index('pnns_groups_2')['groupeAlim_2'].to_dict()
         dict_mapping_1 = mapping_groups.set_index('groupeAlim_2')['groupeAlim_1'].to_dict()
 
-        listing_df[['labelAlim_2', 'statutAlim_2']] = \
+        listing_df[['labelAlim_2', 'group_method']] = \
             listing_df.apply(lambda row: get_foodGroup(row[EAN_col], row[product_name_col],
                                                        dict_mapping_2, clf_nutrients_rf, clf_names_nb),
                              axis=1, result_type='expand')
@@ -171,8 +171,7 @@ def get_foodGroupFromToDF(listing_df,
             print('labelAlim_2 added')
         elif group_name == 'labelAlim_1':
             listing_df['labelAlim_1'] = listing_df['labelAlim_2'].apply(lambda x: dict_mapping_1.get(x))
-            listing_df['statutAlim_1'] = listing_df['statutAlim_2']
-            listing_df.drop(columns=['labelAlim_2', 'statutAlim_2'], inplace=True)
+            listing_df.drop(columns=['labelAlim_2'], inplace=True)
             print('labelAlim_1 added')
         else:
             sys.exit('group_name arg must be labelAlim_1 or labelAlim_2')
