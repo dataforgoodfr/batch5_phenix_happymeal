@@ -25,7 +25,7 @@ def importListing(csv_file,
                   total_price_col=  'TOTAL (HT)'):
     
     # Read food listing file
-    input_listing = pd.read_csv('data/'+ csv_file, sep=';', encoding='UTF-8')
+    input_listing = pd.read_csv(csv_file, sep=';', encoding='UTF-8')
     
     # Checks required columns are present
     for col in [ean_col, product_name_col, quantity_col]:

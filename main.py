@@ -1,5 +1,8 @@
 # coding: utf-8
 
+# Exemple of use:
+# python main.py --meal-weight 5000 --delta-auth 0.5 --csv-file-path data/commande_94349_price.csv --request-id 124
+
 import json
 import os
 import argparse
@@ -45,14 +48,13 @@ def get_off_grams(ean):
 
     return off_qty
 
-# python main.py --meal-weight 5000 --delta-auth 0.5 --csv-file-path commande_94349.csv --request-id 123
-# python main.py --meal-weight 5000 --delta-auth 0.5 --csv-file-path commande_94349_price.csv --request-id 124
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--meal-weight", help="meal weight in grams: 2000", type=float, required=True)
     parser.add_argument("--delta-auth", help="authorised difference between real and ideal distribution: 0.05", type=float, required=True)
-    parser.add_argument("--csv-file-path", help="path to csv file: '/home/ubuntu/input/listing.csv'", type=str, required=True)
+    parser.add_argument("--csv-file-path", help="path to csv file: 'data/listing.csv'", type=str, required=True)
     parser.add_argument("--request-id", help="unique request id: 123456789", type=int, required=True)
     args = parser.parse_args()
 
